@@ -1,7 +1,7 @@
 use rocket::{get, launch, routes, catch, catchers};
-use rocket::response::status;
 use rocket::http::Status;
 use rocket::Request;
+use rocket::serde::json::{json, Value};
 
 use rusqlite::{named_params, Connection};
 
@@ -12,30 +12,33 @@ struct ExchangeRate {
     rate: f64,
 }
 
-#[get("/exchange_rates")]
+#[get("/exchange_rates", format = "json")]
 fn get_exchange_rates() -> &'static str {
     "[]"
 }
 
 #[catch(default)]
-fn error(status: Status, req: &Request<'_>) -> status::Custom<String> {
-    let msg = format!("{} ({})", status, req.uri());
-    status::Custom(status, msg)
+fn error(status: Status, req: &Request<'_>) -> Value {
+    json!({
+        "code": status.code,
+        "message": format!("Failed to handle URI {}", req.uri())
+    })
 }
 
 #[launch]
-async fn rocket() -> _ {
-    let conn = create_db();
+fn rocket() -> _ {
+    println!("Setting up database");
+    get_db().unwrap();
 
     rocket::build()
         .mount("/", routes![get_exchange_rates])
         .register("/", catchers![error])
 }
 
-async fn create_db() -> rusqlite::Result<Connection> {
-    let conn = Connection::open_in_memory()?;
+fn get_db() -> rusqlite::Result<Connection> {
+    let db = Connection::open_in_memory()?;
 
-    conn.execute(
+    db.execute(
         "CREATE TABLE exchange_rate (base, quote, rate)",
         [],
     )?;
@@ -46,9 +49,9 @@ async fn create_db() -> rusqlite::Result<Connection> {
         rate: 35000.0,
     };
 
-    let mut stmt = conn.prepare("INSERT INTO exchange_rate VALUES (:base, :quote, :rate)")?;
+    let mut stmt = db.prepare("INSERT INTO exchange_rate VALUES (:base, :quote, :rate)")?;
     stmt.execute(named_params!{ ":base": rate.base, ":quote": rate.quote, ":rate": rate.rate })?;
     drop(stmt);
 
-    Ok(conn)
+    Ok(db)
 }
