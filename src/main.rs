@@ -2,8 +2,15 @@ use rocket::{get, launch, routes, catch, catchers};
 use rocket::http::Status;
 use rocket::Request;
 use rocket::serde::{Serialize, Deserialize, json::Json};
+use rocket::tokio::sync::Mutex;
+use rocket::State;
+
+use rocket_sync_db_pools::database;
 
 use rusqlite::{named_params, Connection};
+
+#[database("main")]
+struct Db(Connection);
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -20,19 +27,23 @@ struct ErrorResponseBody {
     message: String,
 }
 
-#[get("/exchange_rates", format = "json")]
-fn get_exchange_rates() -> Json<ExchangeRate> {
-    Json(
-        ExchangeRate {
-            base: "USD".to_string(),
-            quote: "BTC".to_string(),
-            rate: 35000.0
-        }
-    )
+#[get("/exchange_rates?<base>&<quote>", format = "json")]
+fn get_exchange_rates(
+    base: &str,
+    quote: &str,
+    _db: Db,
+    ) -> Option<Json<ExchangeRate>> {
+    let rate = ExchangeRate {
+        base: base.to_string(),
+        quote: quote.to_string(),
+        rate: 35000.0
+    };
+    
+    Some(Json(rate))
 }
 
 #[catch(default)]
-fn error(status: Status, req: &Request<'_>) -> Json<ErrorResponseBody> {
+fn error(status: Status, req: &Request) -> Json<ErrorResponseBody> {
     Json(
         ErrorResponseBody {
             code: status.code,
@@ -43,12 +54,14 @@ fn error(status: Status, req: &Request<'_>) -> Json<ErrorResponseBody> {
 
 #[launch]
 fn rocket() -> _ {
-    println!("Setting up database");
-    get_db().unwrap();
+    //println!("Setting up database");
+    //let db = get_db().unwrap();
 
     rocket::build()
         .mount("/", routes![get_exchange_rates])
         .register("/", catchers![error])
+        .attach(Db::fairing())
+        //.manage(Db::new(db))
 }
 
 fn get_db() -> rusqlite::Result<Connection> {
