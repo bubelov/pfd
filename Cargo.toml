@@ -1,10 +1,13 @@
 [package]
-name = "portfoliod"
+name = "pfd"
 version = "0.1.0"
 edition = "2018"
+publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies.rocket]
+version = "0.5.0-rc.1"
+features = [ "json" ]
 
-[dependencies]
-rocket = { version = "0.5.0-rc.1", features = [ "json" ] }
-rusqlite = { version = "0.25.3", features = [ "bundled" ] }
+[dependencies.rusqlite]
+version = "0.25.3"
+features = [ "bundled" ]

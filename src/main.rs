@@ -1,28 +1,44 @@
 use rocket::{get, launch, routes, catch, catchers};
 use rocket::http::Status;
 use rocket::Request;
-use rocket::serde::json::{json, Value};
+use rocket::serde::{Serialize, Deserialize, json::Json};
 
 use rusqlite::{named_params, Connection};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
 struct ExchangeRate {
     base: String,
     quote: String,
     rate: f64,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ErrorResponseBody {
+    code: u16,
+    message: String,
+}
+
 #[get("/exchange_rates", format = "json")]
-fn get_exchange_rates() -> &'static str {
-    "[]"
+fn get_exchange_rates() -> Json<ExchangeRate> {
+    Json(
+        ExchangeRate {
+            base: "USD".to_string(),
+            quote: "BTC".to_string(),
+            rate: 35000.0
+        }
+    )
 }
 
 #[catch(default)]
-fn error(status: Status, req: &Request<'_>) -> Value {
-    json!({
-        "code": status.code,
-        "message": format!("Failed to handle URI {}", req.uri())
-    })
+fn error(status: Status, req: &Request<'_>) -> Json<ErrorResponseBody> {
+    Json(
+        ErrorResponseBody {
+            code: status.code,
+            message: format!("Failed to handle URI {}", req.uri())
+        }
+    )
 }
 
 #[launch]
