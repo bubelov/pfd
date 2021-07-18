@@ -2,13 +2,10 @@ use rocket::{get, launch, routes, catch, catchers};
 use rocket::http::Status;
 use rocket::Request;
 use rocket::serde::{Serialize, Deserialize, json::Json};
-use rocket::response::Debug;
 
 use rocket_sync_db_pools::database;
 
 use rusqlite::{Connection, named_params};
-
-type Result<T, E = Debug<rusqlite::Error>> = std::result::Result<T, E>;
 
 #[database("main")]
 struct Db(Connection);
@@ -29,24 +26,27 @@ struct ErrorResponseBody {
 }
 
 #[get("/exchange_rates?<base>&<quote>", format = "json")]
-async fn get_exchange_rates(
+async fn get_exchange_rate(
     base: &str,
     quote: &str,
     db: Db,
-) -> Result<Json<ExchangeRate>> {
+) -> Option<Json<ExchangeRate>> {
     let base = base.to_string();
     let quote = quote.to_string();
-    db.run(move |c| {
-        let mut stmt = c.prepare("SELECT rate FROM exchange_rate WHERE base = :base AND quote = :quote")?;
-        let rate = stmt.query_row(named_params!{":base": base.clone(), ":quote": quote.clone()}, |r| {
+    let rate = db.run(move |c| {
+        c.query_row(
+            "SELECT rate FROM exchange_rate WHERE base = :base AND quote = :quote",
+            named_params!{":base": &base, ":quote": &quote},
+            |r| {
             Ok(ExchangeRate {
                 base: base.clone(),
                 quote: quote.clone(),
                 rate: r.get(0)?
             })
-        })?;
-        Ok(Json(rate))
-    }).await
+        })
+    }).await.ok()?;
+
+    Some(Json(rate))
 }
 
 #[catch(default)]
@@ -62,7 +62,7 @@ fn error(status: Status, req: &Request) -> Json<ErrorResponseBody> {
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![get_exchange_rates])
+        .mount("/", routes![get_exchange_rate])
         .register("/", catchers![error])
         .attach(Db::fairing())
 }
