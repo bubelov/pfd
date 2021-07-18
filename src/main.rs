@@ -59,10 +59,20 @@ fn error(status: Status, req: &Request) -> Json<ErrorResponseBody> {
     )
 }
 
+#[catch(404)]
+fn error_404(status: Status, req: &Request) -> Json<ErrorResponseBody> {
+    Json(
+        ErrorResponseBody {
+            code: status.code,
+            message: "Requested resource does not exist".to_string()
+        }
+    )
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![get_exchange_rate])
-        .register("/", catchers![error])
+        .register("/", catchers![error, error_404])
         .attach(Db::fairing())
 }
