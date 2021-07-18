@@ -2,12 +2,13 @@ use rocket::{get, launch, routes, catch, catchers};
 use rocket::http::Status;
 use rocket::Request;
 use rocket::serde::{Serialize, Deserialize, json::Json};
-use rocket::tokio::sync::Mutex;
-use rocket::State;
+use rocket::response::Debug;
 
 use rocket_sync_db_pools::database;
 
-use rusqlite::{named_params, Connection};
+use rusqlite::Connection;
+
+type Result<T, E = Debug<rusqlite::Error>> = std::result::Result<T, E>;
 
 #[database("main")]
 struct Db(Connection);
@@ -32,14 +33,14 @@ fn get_exchange_rates(
     base: &str,
     quote: &str,
     _db: Db,
-    ) -> Option<Json<ExchangeRate>> {
+    ) -> Result<Json<ExchangeRate>> {
     let rate = ExchangeRate {
         base: base.to_string(),
         quote: quote.to_string(),
         rate: 35000.0
     };
     
-    Some(Json(rate))
+    Ok(Json(rate))
 }
 
 #[catch(default)]
@@ -54,33 +55,8 @@ fn error(status: Status, req: &Request) -> Json<ErrorResponseBody> {
 
 #[launch]
 fn rocket() -> _ {
-    //println!("Setting up database");
-    //let db = get_db().unwrap();
-
     rocket::build()
         .mount("/", routes![get_exchange_rates])
         .register("/", catchers![error])
         .attach(Db::fairing())
-        //.manage(Db::new(db))
-}
-
-fn get_db() -> rusqlite::Result<Connection> {
-    let db = Connection::open_in_memory()?;
-
-    db.execute(
-        "CREATE TABLE exchange_rate (base, quote, rate)",
-        [],
-    )?;
-
-    let rate = ExchangeRate {
-        base: "USD".to_string(),
-        quote: "BTC".to_string(),
-        rate: 35000.0,
-    };
-
-    let mut stmt = db.prepare("INSERT INTO exchange_rate VALUES (:base, :quote, :rate)")?;
-    stmt.execute(named_params!{ ":base": rate.base, ":quote": rate.quote, ":rate": rate.rate })?;
-    drop(stmt);
-
-    Ok(db)
 }
