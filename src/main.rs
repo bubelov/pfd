@@ -60,10 +60,10 @@ fn error(status: Status, req: &Request) -> Json<ErrorResponseBody> {
 }
 
 #[catch(404)]
-fn error_404(status: Status, req: &Request) -> Json<ErrorResponseBody> {
+fn error_404() -> Json<ErrorResponseBody> {
     Json(
         ErrorResponseBody {
-            code: status.code,
+            code: 404,
             message: "Requested resource does not exist".to_string()
         }
     )
@@ -75,4 +75,18 @@ fn rocket() -> _ {
         .mount("/", routes![get_exchange_rate])
         .register("/", catchers![error, error_404])
         .attach(Db::fairing())
+}
+
+#[cfg(test)]
+mod test {
+    use super::rocket;
+    use rocket::local::blocking::Client;
+    use rocket::http::Status;
+
+    #[test]
+    fn get_exchange_rate() {
+        let client = Client::tracked(rocket()).unwrap();
+        let response = client.get("/exchange_rates?base=USD&quote=BTC").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+    }
 }
