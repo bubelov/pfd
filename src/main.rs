@@ -6,7 +6,7 @@ use rocket::response::Debug;
 
 use rocket_sync_db_pools::database;
 
-use rusqlite::Connection;
+use rusqlite::{Connection, named_params};
 
 type Result<T, E = Debug<rusqlite::Error>> = std::result::Result<T, E>;
 
@@ -29,18 +29,24 @@ struct ErrorResponseBody {
 }
 
 #[get("/exchange_rates?<base>&<quote>", format = "json")]
-fn get_exchange_rates(
+async fn get_exchange_rates(
     base: &str,
     quote: &str,
-    _db: Db,
-    ) -> Result<Json<ExchangeRate>> {
-    let rate = ExchangeRate {
-        base: base.to_string(),
-        quote: quote.to_string(),
-        rate: 35000.0
-    };
-    
-    Ok(Json(rate))
+    db: Db,
+) -> Result<Json<ExchangeRate>> {
+    let base = base.to_string();
+    let quote = quote.to_string();
+    db.run(move |c| {
+        let mut stmt = c.prepare("SELECT rate FROM exchange_rate WHERE base = :base AND quote = :quote")?;
+        let rate = stmt.query_row(named_params!{":base": base.clone(), ":quote": quote.clone()}, |r| {
+            Ok(ExchangeRate {
+                base: base.clone(),
+                quote: quote.clone(),
+                rate: r.get(0)?
+            })
+        })?;
+        Ok(Json(rate))
+    }).await
 }
 
 #[catch(default)]
