@@ -1,2 +1,8 @@
-[global.databases]
-main = { url = "pfd.db" }
+[debug.databases.main]
+url = ":memory:"
+
+[release.databases.main]
+url = "release.db"
+
+[test.databases.main]
+url = ":memory:"
