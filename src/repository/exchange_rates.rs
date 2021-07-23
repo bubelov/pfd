@@ -12,7 +12,13 @@ pub fn find_by_base_and_quote(
             quote: quote.clone(),
             rate: r.get(0)?
         })
-    }).unwrap();
+    });
 
-    Some(rate)
+    match rate {
+        Ok(rate) => Some(rate),
+        Err(e) => {
+            println!("SQLite error: {:?}", e);
+            None
+        },
+    }
 }
