@@ -9,5 +9,7 @@ pub fn run(c: &mut rusqlite::Connection) {
             rate REAL NOT NULL
         )
         "#,
-        []).unwrap();
+        [],
+    )
+    .unwrap();
 }
