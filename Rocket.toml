@@ -1,5 +1,5 @@
 [debug.databases.main]
-url = ":memory:"
+url = "file::memory:?cache=shared"
 
 [release.databases.main]
-url = "release.db"
+url = "rates.db"
