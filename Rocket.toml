@@ -3,6 +3,3 @@ url = ":memory:"
 
 [release.databases.main]
 url = "release.db"
-
-[test.databases.main]
-url = ":memory:"

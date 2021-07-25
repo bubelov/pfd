@@ -10,6 +10,7 @@ pub struct Db(rusqlite::Connection);
 
 #[rocket::launch]
 fn rocket() -> _ {
+    println!("Launching rocket");
     rocket::build()
         .mount("/", rocket::routes![controller::exchange_rates::get])
         .register("/", rocket::catchers![error, error_404])
@@ -21,8 +22,17 @@ fn rocket() -> _ {
 }
 
 async fn run_migrations(rocket: rocket::Rocket<rocket::Build>) -> rocket::Rocket<rocket::Build> {
+    println!("Running migrations...");
     let db = Db::get_one(&rocket).await.unwrap();
     db.run(|c| migrations::run(c)).await;
+    println!("Finished running migrations");
+
+    // NOTE here it returns "no rows" error, which is expected since there are no rows
+    db.run(|c| {
+        repository::exchange_rates::find_by_base_and_quote(c, "USD".to_string(), "EUR".to_string())
+    })
+    .await;
+
     rocket
 }
 
