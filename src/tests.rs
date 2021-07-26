@@ -1,11 +1,15 @@
-use rocket::local::asynchronous::Client;
+use crate::{rocket, Db, model::ExchangeRate};
+use rocket::{http::Status, local::asynchronous::Client, serde::json};
 
 #[rocket::async_test]
 async fn exchange_rates_controller_get() {
-    let client = Client::untracked(crate::rocket()).await.unwrap();
-    println!("Initialized test client");
-    let db = crate::Db::get_one(client.rocket()).await.unwrap();
-    println!("Got test DB handle");
+    let client = Client::untracked(rocket()).await.unwrap();
+    let db = Db::get_one(client.rocket()).await.unwrap();
+    let rate = ExchangeRate {
+        base: "USD".to_string(),
+        quote: "EUR".to_string(),
+        rate: 1.25,
+    };
 
     db.run(|c| {
         c.execute(
@@ -19,10 +23,17 @@ async fn exchange_rates_controller_get() {
     })
     .await;
 
-    // NOTE it returns "no table" error, which is unexpected
-    // because migration should have created that table
-    let request = client.get("/exchange_rates?base=USD&quote=EUR");
-    let response = request.dispatch().await;
+    let req = client.get("/exchange_rates?base=USD&quote=EUR");
+    let res = req.dispatch().await;
+    assert_eq!(res.status(), Status::Ok);
+    let body = res.into_string().await.unwrap();
+    let body: ExchangeRate = json::from_str(&body).unwrap();
+    assert_eq!(rate, body);
 
-    assert_eq!(response.status(), rocket::http::Status::Ok);
+    let req = client.get("/exchange_rates?base=USD&quote=EUR");
+    let res = req.dispatch().await;
+    assert_eq!(res.status(), Status::Ok);
+    // Time to halt forever...
+    let body = res.into_json::<ExchangeRate>().await.unwrap();
+    assert_eq!(rate, body);
 }

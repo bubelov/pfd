@@ -1,4 +1,6 @@
-#[derive(Debug, rocket::serde::Serialize)]
+use rocket::serde::{Serialize, Deserialize};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct ExchangeRate {
     pub base: String,
@@ -6,7 +8,7 @@ pub struct ExchangeRate {
     pub rate: f64,
 }
 
-#[derive(Debug, rocket::serde::Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct ErrorResponseBody {
     pub code: u16,
