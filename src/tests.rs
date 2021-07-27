@@ -1,10 +1,17 @@
 use crate::{model::ExchangeRate, repository::exchange_rates, rocket, Db};
 use rocket::{http::Status, local::asynchronous::Client, serde::json};
 
+async fn setup() -> (Client, Db) {
+    let profile = rocket::Config::figment().select("test");
+    let rocket = rocket(rocket::custom(&profile)).await;
+    let client = Client::untracked(rocket).await.unwrap();
+    let db = Db::get_one(client.rocket()).await.unwrap();
+    (client, db)
+}
+
 #[rocket::async_test]
 async fn exchange_rates_controller_get() {
-    let client = Client::untracked(rocket()).await.unwrap();
-    let db = Db::get_one(client.rocket()).await.unwrap();
+    let (client, db) = setup().await;
 
     fn rate() -> ExchangeRate {
         ExchangeRate {
@@ -16,8 +23,10 @@ async fn exchange_rates_controller_get() {
 
     db.run(|conn| exchange_rates::insert(conn, &rate())).await;
 
-    let req = client.get("/exchange_rates?base=USD&quote=EUR");
-    let res = req.dispatch().await;
+    let res = client
+        .get("/exchange_rates?base=USD&quote=EUR")
+        .dispatch()
+        .await;
     assert_eq!(res.status(), Status::Ok);
 
     let body = res.into_string().await.unwrap();

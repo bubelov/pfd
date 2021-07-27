@@ -5,16 +5,20 @@ mod repository;
 #[cfg(test)]
 mod tests;
 
-use rocket::{fairing::AdHoc, launch, routes, Build, Rocket};
+use rocket::{fairing::AdHoc, routes, Build, Rocket};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
 
 #[database("main")]
 pub struct Db(Connection);
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build()
+#[rocket::main]
+async fn main() {
+    rocket(rocket::build()).await.launch().await.unwrap();
+}
+
+async fn rocket(rocket: Rocket<Build>) -> Rocket<Build> {
+    rocket
         .mount("/", routes![controller::exchange_rates::get])
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
