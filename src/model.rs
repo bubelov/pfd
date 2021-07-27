@@ -1,4 +1,11 @@
-use rocket::serde::{Serialize, Deserialize};
+use rocket::{
+    async_trait,
+    http::{ContentType, Status},
+    request::Request,
+    response::{self, Responder, Response},
+    serde::{Deserialize, Serialize},
+};
+use std::io::Cursor;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -10,7 +17,23 @@ pub struct ExchangeRate {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
-pub struct ErrorResponseBody {
+pub struct Error {
     pub code: u16,
     pub message: String,
+}
+
+#[async_trait]
+impl<'r> Responder<'r, 'static> for Error {
+    fn respond_to(self, _: &'r Request<'_>) -> response::Result<'static> {
+        let body = format!(
+            "{{\"code\": {}, \"message\": \"{}\"}}",
+            self.code, self.message
+        );
+
+        Response::build()
+            .header(ContentType::JSON)
+            .status(Status::new(self.code))
+            .sized_body(body.len(), Cursor::new(body))
+            .ok()
+    }
 }

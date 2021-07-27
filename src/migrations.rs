@@ -1,5 +1,7 @@
-pub fn run(c: &mut rusqlite::Connection) {
-    c.execute(
+use rusqlite::Connection;
+
+pub fn run(conn: &mut Connection) {
+    conn.execute(
         r#"
         CREATE TABLE exchange_rate (
             base TEXT NOT NULL,

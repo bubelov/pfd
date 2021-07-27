@@ -1,25 +1,26 @@
-pub fn find_by_base_and_quote(
-    conn: &mut rusqlite::Connection,
-    base: String,
-    quote: String,
-) -> Option<crate::model::ExchangeRate> {
-    let rate = conn.query_row(
-        "SELECT rate FROM exchange_rate WHERE base = :base AND quote = :quote",
-        rusqlite::named_params! {":base": base.clone(), ":quote": quote.clone()},
+use crate::model::ExchangeRate;
+use rusqlite::{params, Connection, Error};
+
+pub fn insert(conn: &mut Connection, row: &ExchangeRate) {
+    let query = "INSERT INTO exchange_rate (base, quote, rate) VALUES (?, ?, ?)";
+    let params = params![&row.base, &row.quote, row.rate];
+    conn.execute(query, params).unwrap();
+}
+
+pub fn select_by_base_and_quote(
+    conn: &mut Connection,
+    base: &String,
+    quote: &String,
+) -> Result<ExchangeRate, Error> {
+    conn.query_row(
+        "SELECT rate FROM exchange_rate WHERE base = ? AND quote = ?",
+        params![base, quote],
         |r| {
-            Ok(crate::model::ExchangeRate {
+            Ok(ExchangeRate {
                 base: base.clone(),
                 quote: quote.clone(),
                 rate: r.get(0)?,
             })
         },
-    );
-
-    match rate {
-        Ok(rate) => Some(rate),
-        Err(e) => {
-            println!("SQLite error: {:?}", e);
-            None
-        }
-    }
+    )
 }
