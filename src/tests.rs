@@ -1,35 +1,29 @@
-use crate::{model::ExchangeRate, repository::exchange_rates, rocket, Db};
-use rocket::{http::Status, local::asynchronous::Client, serde::json};
+use crate::{get_db_connection, model::ExchangeRate, prepare, repository::exchange_rates};
+use rocket::{http::Status, local::blocking::Client};
+use rusqlite::Connection;
 
-async fn setup() -> (Client, Db) {
-    let profile = rocket::Config::figment().select("test");
-    let rocket = rocket(rocket::custom(&profile)).await;
-    let client = Client::untracked(rocket).await.unwrap();
-    let db = Db::get_one(client.rocket()).await.unwrap();
-    (client, db)
+fn setup() -> (Client, Connection) {
+    let conf = rocket::Config::figment().select("test");
+    let rocket = prepare(rocket::custom(&conf));
+    let client = Client::untracked(rocket).unwrap();
+    (client, get_db_connection(&conf))
 }
 
-#[rocket::async_test]
-async fn exchange_rates_controller_get() {
-    let (client, db) = setup().await;
+#[test]
+fn exchange_rates_controller_get() {
+    let (client, mut db) = setup();
 
-    fn rate() -> ExchangeRate {
-        ExchangeRate {
-            base: "USD".to_string(),
-            quote: "EUR".to_string(),
-            rate: 1.25,
-        }
-    }
+    let rate = ExchangeRate {
+        base: "USD".to_string(),
+        quote: "EUR".to_string(),
+        rate: 1.25,
+    };
 
-    db.run(|conn| exchange_rates::insert(conn, &rate())).await;
+    exchange_rates::insert(&mut db, &rate);
 
-    let res = client
-        .get("/exchange_rates?base=USD&quote=EUR")
-        .dispatch()
-        .await;
+    let res = client.get("/exchange_rates?base=USD&quote=EUR").dispatch();
+
     assert_eq!(res.status(), Status::Ok);
-
-    let body = res.into_string().await.unwrap();
-    let body: ExchangeRate = json::from_str(&body).unwrap();
-    assert_eq!(rate(), body);
+    let body = res.into_json::<ExchangeRate>().unwrap();
+    assert_eq!(rate, body);
 }
