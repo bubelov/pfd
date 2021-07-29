@@ -1,4 +1,4 @@
-use crate::{get_db_connection, model::ExchangeRate, prepare, repository::exchange_rates};
+use crate::{db, model::ExchangeRate, prepare, repository::exchange_rates};
 use rocket::{http::Status, local::blocking::Client};
 use rusqlite::Connection;
 
@@ -6,7 +6,7 @@ fn setup() -> (Client, Connection) {
     let conf = rocket::Config::figment().select("test");
     let rocket = prepare(rocket::custom(&conf));
     let client = Client::untracked(rocket).unwrap();
-    (client, get_db_connection(&conf))
+    (client, db::connect(&conf))
 }
 
 #[test]

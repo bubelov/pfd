@@ -1,5 +1,6 @@
-[default.databases.main]
-url = "rates.db"
+[default]
+databases.main.url = "rates.db"
+provider = "ecb"
 
-[test.databases.main]
-url = "file::memory:?cache=shared"
+[test]
+databases.main.url = "file::memory:?cache=shared"

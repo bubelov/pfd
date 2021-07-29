@@ -1,7 +1,7 @@
 use crate::{
+    db::Db,
     model::{Error, ExchangeRate},
     repository::exchange_rates,
-    Db,
 };
 use rocket::{get, serde::json::Json};
 
