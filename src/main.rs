@@ -1,12 +1,11 @@
 mod controller;
 mod db;
-mod migrations;
 mod model;
 mod repository;
 #[cfg(test)]
 mod tests;
 
-use db::Db;
+use db::{Db, DbVersion};
 use rocket::{fairing::AdHoc, routes, Build, Rocket};
 use std::env;
 
@@ -34,7 +33,9 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
 }
 
 async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
+    let conf = rocket.figment().clone();
     let db = Db::get_one(&rocket).await.unwrap();
-    db.run(|conn| migrations::run(conn)).await;
+    db.run(move |conn| db::migrate(&conf, conn, DbVersion::Latest))
+        .await;
     rocket
 }

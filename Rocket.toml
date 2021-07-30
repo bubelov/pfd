@@ -1,6 +1,18 @@
 [default]
-databases.main.url = "rates.db"
 provider = "ecb"
+databases.main.url = "rates.db"
 
-[test]
-databases.main.url = "file::memory:?cache=shared"
+[[default.migrations]]
+version = 1
+up = """
+CREATE TABLE exchange_rate (
+    base TEXT NOT NULL,
+    quote TEXT NOT NULL,
+    rate REAL NOT NULL
+)
+"""
+down = "DROP TABLE exchange_rate"
+
+[test.databases.main]
+url = "file::memory:?cache=shared"
+
