@@ -13,6 +13,3 @@ CREATE TABLE exchange_rate (
 """
 down = "DROP TABLE exchange_rate"
 
-[test.databases.main]
-url = "file::memory:?cache=shared"
-

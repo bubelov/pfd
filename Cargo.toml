@@ -15,6 +15,3 @@ features = ["sqlite_pool"]
 [dependencies.rusqlite]
 version = "0.25.3"
 features = [ "bundled" ]
-
-[dev-dependencies]
-serial_test = "0.5.1"
