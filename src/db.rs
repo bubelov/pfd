@@ -26,7 +26,7 @@ enum RatesProvider {
     Ecb,
 }
 
-pub fn cli(args: Vec<String>) {
+pub fn cli(args: &Vec<String>) {
     let action = &args[2];
     let conf = Config::figment();
 

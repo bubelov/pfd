@@ -7,16 +7,19 @@ mod tests;
 
 use db::{Db, DbVersion};
 use rocket::{fairing::AdHoc, routes, Build, Rocket};
-use std::env;
+use std::{env, process::exit};
 
 #[rocket::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    cli(args).await;
+    cli(&args).await;
 }
 
-async fn cli(args: Vec<String>) {
-    let action = &args[1];
+async fn cli(args: &Vec<String>) {
+    let action = args.get(1).unwrap_or_else(|| {
+        println!("Action is not specified");
+        exit(1);
+    });
 
     match action.as_str() {
         "db" => db::cli(args),
