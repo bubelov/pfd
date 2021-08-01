@@ -16,10 +16,7 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
 
     if let Err(e) = rate {
         eprintln!("{}", e);
-        return Err(Error {
-            code: 500,
-            message: "Internal server error".to_string(),
-        });
+        return Err(Error::new(500, "Internal server error"));
     }
 
     if let Some(v) = rate.unwrap() {
@@ -35,10 +32,7 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
 
     if let Err(e) = rate {
         eprintln!("{}", e);
-        return Err(Error {
-            code: 500,
-            message: "Internal server error".to_string(),
-        });
+        return Err(Error::new(500, "Internal server error"));
     }
 
     if let Some(v) = rate.unwrap() {
@@ -49,8 +43,5 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
         }));
     }
 
-    Err(Error {
-        code: 404,
-        message: "Not found".to_string(),
-    })
+    Err(Error::new(404, "Not found"))
 }
