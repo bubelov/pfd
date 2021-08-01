@@ -1,7 +1,7 @@
 use rocket::{figment::Figment, serde::Deserialize, Config};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::fs::remove_file;
+use std::{fs::remove_file, process::exit};
 
 #[database("main")]
 pub struct Db(Connection);
@@ -26,35 +26,38 @@ enum RatesProvider {
     Ecb,
 }
 
-pub fn cli(args: &Vec<String>) {
-    let action = &args[2];
-    let conf = Config::figment();
+pub fn cli(args: &[String]) {
+    let action = args.get(0).unwrap_or_else(|| {
+        println!("Database action is not specified");
+        exit(1);
+    });
 
     match action.as_str() {
-        "drop" => {
-            println!("Dropping database...");
-            let db = conf.find_value("databases.main.url").unwrap();
-            let db = db.as_str().unwrap();
-            println!("Database URL: {:?}", db);
-            remove_file(db).unwrap();
-            println!("Database has been dropped");
-        }
+        "drop" => drop(),
         "migrate" => {
+            let conf = Config::figment();
             let mut conn = connect(&conf);
-            migrate(&conf, &mut conn, DbVersion::Latest);
+            let version = match args.get(1) {
+                Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
+                None => DbVersion::Latest,
+            };
+            migrate(&conf, &mut conn, version);
         }
-        "sync" => {
-            let provider: RatesProvider = conf.extract_inner("provider").unwrap();
-            println!("Provider: {:?}", provider);
+        "sync" => sync(),
+        _ => {
+            println!("Unknown action: {}", action);
+            exit(1);
         }
-        _ => println!("Unknown action: {}", action),
     };
 }
 
-pub fn connect(conf: &Figment) -> Connection {
-    let url = conf.find_value("databases.main.url").unwrap();
-    let url = url.as_str().unwrap();
-    Connection::open(url).unwrap()
+fn drop() {
+    println!("Dropping database...");
+    let db = Config::figment().find_value("databases.main.url").unwrap();
+    let db = db.as_str().unwrap();
+    println!("Database URL: {:?}", db);
+    remove_file(db).unwrap();
+    println!("Database has been dropped");
 }
 
 pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion) {
@@ -89,7 +92,7 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
         println!("Pending migrations found: {}", migrations.len());
         for migr in migrations {
             println!("Updating schema to version {}", migr.version);
-            println!("{}", &migr.up);
+            println!("{}", &migr.up.trim());
             conn.execute(&migr.up, []).unwrap();
             conn.execute(&format!("PRAGMA user_version={}", migr.version), [])
                 .unwrap();
@@ -104,12 +107,24 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
         println!("Pending migrations found: {}", migrations.len());
         for migr in migrations.iter().rev() {
             println!("Downgrading schema to version {}", migr.version - 1);
-            println!("{}", &migr.down);
+            println!("{}", &migr.down.trim());
             conn.execute(&migr.down, []).unwrap();
             conn.execute(&format!("PRAGMA user_version={}", migr.version - 1), [])
                 .unwrap();
         }
     }
+}
+
+fn sync() {
+    let conf = Config::figment();
+    let provider: RatesProvider = conf.extract_inner("provider").unwrap();
+    println!("Provider: {:?}", provider);
+}
+
+pub fn connect(conf: &Figment) -> Connection {
+    let url = conf.find_value("databases.main.url").unwrap();
+    let url = url.as_str().unwrap();
+    Connection::open(url).unwrap()
 }
 
 fn schema_version(conn: &Connection) -> rusqlite::Result<i16> {

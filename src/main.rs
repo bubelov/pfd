@@ -12,19 +12,22 @@ use std::{env, process::exit};
 #[rocket::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    cli(&args).await;
+    cli(&args[1..]).await;
 }
 
-async fn cli(args: &Vec<String>) {
-    let action = args.get(1).unwrap_or_else(|| {
+async fn cli(args: &[String]) {
+    let action = args.get(0).unwrap_or_else(|| {
         println!("Action is not specified");
         exit(1);
     });
 
     match action.as_str() {
-        "db" => db::cli(args),
+        "db" => db::cli(&args[1..]),
         "serve" => prepare(rocket::build()).launch().await.unwrap(),
-        _ => println!("Unknown action: {}", action),
+        _ => {
+            println!("Unknown action: {}", action);
+            exit(1);
+        }
     }
 }
 
