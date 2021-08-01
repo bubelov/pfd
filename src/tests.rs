@@ -24,7 +24,7 @@ fn exchange_rates_controller_get() {
         rate: 1.25,
     };
 
-    exchange_rates::insert(&mut db, &rate);
+    exchange_rates::insert_or_replace(&mut db, &rate);
 
     let res = client.get("/exchange_rates?base=USD&quote=EUR").dispatch();
 

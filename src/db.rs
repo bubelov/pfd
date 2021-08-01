@@ -1,7 +1,14 @@
+use crate::{model::ExchangeRate, repository::exchange_rates};
 use rocket::{figment::Figment, serde::Deserialize, Config};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::{fs::remove_file, process::exit};
+use std::{
+    error::Error,
+    fs::remove_file,
+    io::{copy, Cursor},
+    process::exit,
+};
+use zip::ZipArchive;
 
 #[database("main")]
 pub struct Db(Connection);
@@ -26,7 +33,7 @@ enum RatesProvider {
     Ecb,
 }
 
-pub fn cli(args: &[String]) {
+pub async fn cli(args: &[String]) {
     let action = args.get(0).unwrap_or_else(|| {
         println!("Database action is not specified");
         exit(1);
@@ -43,7 +50,9 @@ pub fn cli(args: &[String]) {
             };
             migrate(&conf, &mut conn, version);
         }
-        "sync" => sync(),
+        "sync" => sync().await.unwrap_or_else(|e| {
+            println!("Sync failed with error: {:?}", e);
+        }),
         _ => {
             println!("Unknown action: {}", action);
             exit(1);
@@ -115,10 +124,50 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
     }
 }
 
-fn sync() {
+async fn sync() -> Result<(), Box<dyn Error>> {
     let conf = Config::figment();
-    let provider: RatesProvider = conf.extract_inner("provider").unwrap();
-    println!("Provider: {:?}", provider);
+    let provider: RatesProvider = conf.extract_inner("provider")?;
+
+    match provider {
+        RatesProvider::Ecb => sync_ecb().await?,
+    }
+
+    Ok(())
+}
+
+async fn sync_ecb() -> Result<(), Box<dyn Error>> {
+    let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
+    let res = reqwest::get(url).await?;
+    let body = Cursor::new(res.bytes().await?);
+    let mut archive = ZipArchive::new(body)?;
+    let mut compressed_csv = archive.by_index(0)?;
+    let mut csv: Vec<u8> = vec![];
+    copy(&mut compressed_csv, &mut csv)?;
+    let csv = String::from_utf8(csv)?;
+    let lines: Vec<&str> = csv.lines().collect();
+    let headers: Vec<&str> = lines[0].strip_suffix(", ").unwrap().split(", ").collect();
+    let codes = &headers[1..];
+    let values: Vec<&str> = lines[1].strip_suffix(", ").unwrap().split(", ").collect();
+    let rates = &values[1..];
+
+    let rates: Vec<ExchangeRate> = codes
+        .iter()
+        .zip(rates.iter())
+        .map(|(code, rate)| ExchangeRate {
+            base: "EUR".to_string(),
+            quote: code.to_string(),
+            rate: rate.parse::<f64>().unwrap(),
+        })
+        .collect();
+
+    let conf = Config::figment();
+    let mut conn = connect(&conf);
+
+    for rate in rates {
+        exchange_rates::insert_or_replace(&mut conn, &rate);
+    }
+
+    Ok(())
 }
 
 pub fn connect(conf: &Figment) -> Connection {

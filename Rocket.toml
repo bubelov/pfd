@@ -13,3 +13,7 @@ CREATE TABLE exchange_rate (
 """
 down = "DROP TABLE exchange_rate"
 
+[[default.migrations]]
+version = 2
+up = "CREATE UNIQUE INDEX idx_exchange_rate_base_quote ON exchange_rate (base, quote)"
+down = "DROP INDEX idx_exchange_rate_base_quote"

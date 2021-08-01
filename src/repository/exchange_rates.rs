@@ -2,8 +2,8 @@ use crate::model::ExchangeRate;
 use rusqlite::{params, Connection, Error};
 
 #[allow(dead_code)]
-pub fn insert(conn: &mut Connection, row: &ExchangeRate) {
-    let query = "INSERT INTO exchange_rate (base, quote, rate) VALUES (?, ?, ?)";
+pub fn insert_or_replace(conn: &mut Connection, row: &ExchangeRate) {
+    let query = "INSERT OR REPLACE INTO exchange_rate (base, quote, rate) VALUES (?, ?, ?)";
     let params = params![&row.base, &row.quote, row.rate];
     conn.execute(query, params).unwrap();
 }

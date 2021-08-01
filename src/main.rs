@@ -22,7 +22,7 @@ async fn cli(args: &[String]) {
     });
 
     match action.as_str() {
-        "db" => db::cli(&args[1..]),
+        "db" => db::cli(&args[1..]).await,
         "serve" => prepare(rocket::build()).launch().await.unwrap(),
         _ => {
             println!("Unknown action: {}", action);
