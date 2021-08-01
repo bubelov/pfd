@@ -14,17 +14,16 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
         .run(move |conn| exchange_rates::select_by_base_and_quote(conn, &base_owned, &quote_owned))
         .await;
 
-    if rate.is_err() {
+    if let Err(e) = rate {
+        eprintln!("{}", e);
         return Err(Error {
             code: 500,
             message: "Internal server error".to_string(),
         });
     }
 
-    let rate = rate.unwrap();
-
-    if rate.is_some() {
-        return Ok(Json(rate.unwrap()));
+    if let Some(v) = rate.unwrap() {
+        return Ok(Json(v));
     }
 
     let base_owned = base.to_string();
@@ -34,20 +33,19 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
         .run(move |conn| exchange_rates::select_by_base_and_quote(conn, &quote_owned, &base_owned))
         .await;
 
-    if rate.is_err() {
+    if let Err(e) = rate {
+        eprintln!("{}", e);
         return Err(Error {
             code: 500,
             message: "Internal server error".to_string(),
         });
     }
 
-    let rate = rate.unwrap();
-
-    if rate.is_some() {
+    if let Some(v) = rate.unwrap() {
         return Ok(Json(ExchangeRate {
             base: base.to_string(),
             quote: quote.to_string(),
-            rate: 1.0 / rate.unwrap().rate,
+            rate: 1.0 / v.rate,
         }));
     }
 
