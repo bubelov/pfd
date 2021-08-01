@@ -34,6 +34,31 @@ fn exchange_rates_controller_get() {
 }
 
 #[test]
+fn exchange_rates_controller_get_inversed() {
+    let (client, mut db) = setup();
+
+    let rate = ExchangeRate {
+        base: "USD".to_string(),
+        quote: "EUR".to_string(),
+        rate: 1.19,
+    };
+
+    let inversed_rate = ExchangeRate {
+        base: "EUR".to_string(),
+        quote: "USD".to_string(),
+        rate: 1.0 / 1.19,
+    };
+
+    exchange_rates::insert_or_replace(&mut db, &rate);
+
+    let res = client.get("/exchange_rates?base=EUR&quote=USD").dispatch();
+
+    assert_eq!(res.status(), Status::Ok);
+    let body = res.into_json::<ExchangeRate>().unwrap();
+    assert_eq!(inversed_rate, body);
+}
+
+#[test]
 fn exchange_rates_controller_get_should_return_404_if_not_found() {
     let (client, _) = setup();
     let res = client.get("/exchange_rates?base=USD&quote=EUR").dispatch();

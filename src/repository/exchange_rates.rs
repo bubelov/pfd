@@ -1,5 +1,5 @@
 use crate::model::ExchangeRate;
-use rusqlite::{params, Connection, Error};
+use rusqlite::{params, Connection, Error, OptionalExtension};
 
 #[allow(dead_code)]
 pub fn insert_or_replace(conn: &mut Connection, row: &ExchangeRate) {
@@ -12,7 +12,7 @@ pub fn select_by_base_and_quote(
     conn: &mut Connection,
     base: &String,
     quote: &String,
-) -> Result<ExchangeRate, Error> {
+) -> Result<Option<ExchangeRate>, Error> {
     conn.query_row(
         "SELECT rate FROM exchange_rate WHERE base = ? AND quote = ?",
         params![base, quote],
@@ -24,4 +24,5 @@ pub fn select_by_base_and_quote(
             })
         },
     )
+    .optional()
 }

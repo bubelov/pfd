@@ -156,7 +156,7 @@ async fn sync_ecb() -> Result<(), Box<dyn Error>> {
         .map(|(code, rate)| ExchangeRate {
             base: "EUR".to_string(),
             quote: code.to_string(),
-            rate: rate.parse::<f64>().unwrap(),
+            rate: 1.0 / rate.parse::<f64>().unwrap(),
         })
         .collect();
 
