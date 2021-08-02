@@ -5,13 +5,13 @@ use crate::{
 };
 use rocket::{get, serde::json::Json};
 
-#[get("/exchange_rates?<base>&<quote>")]
+#[get("/exchange_rates?<quote>&<base>")]
 pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, Error> {
-    let base_owned = base.to_string();
     let quote_owned = quote.to_string();
+    let base_owned = base.to_string();
 
     let rate = db
-        .run(move |conn| exchange_rates::select_by_base_and_quote(conn, &base_owned, &quote_owned))
+        .run(move |conn| exchange_rates::select_by_quote_and_base(conn, &quote_owned, &base_owned))
         .await;
 
     if let Err(e) = rate {
@@ -23,11 +23,11 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
         return Ok(Json(v));
     }
 
-    let base_owned = base.to_string();
     let quote_owned = quote.to_string();
+    let base_owned = base.to_string();
 
     let rate = db
-        .run(move |conn| exchange_rates::select_by_base_and_quote(conn, &quote_owned, &base_owned))
+        .run(move |conn| exchange_rates::select_by_quote_and_base(conn, &base_owned, &quote_owned))
         .await;
 
     if let Err(e) = rate {
@@ -37,8 +37,8 @@ pub async fn get(base: &str, quote: &str, db: Db) -> Result<Json<ExchangeRate>, 
 
     if let Some(v) = rate.unwrap() {
         return Ok(Json(ExchangeRate {
-            base: base.to_string(),
             quote: quote.to_string(),
+            base: base.to_string(),
             rate: 1.0 / v.rate,
         }));
     }

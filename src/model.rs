@@ -10,8 +10,8 @@ use std::io::Cursor;
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct ExchangeRate {
-    pub base: String,
     pub quote: String,
+    pub base: String,
     pub rate: f64,
 }
 

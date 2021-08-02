@@ -19,14 +19,14 @@ fn exchange_rates_controller_get() {
     let (client, mut db) = setup();
 
     let rate = ExchangeRate {
-        base: "USD".to_string(),
         quote: "EUR".to_string(),
+        base: "USD".to_string(),
         rate: 1.25,
     };
 
     exchange_rates::insert_or_replace(&mut db, &rate);
 
-    let res = client.get("/exchange_rates?base=USD&quote=EUR").dispatch();
+    let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
 
     assert_eq!(res.status(), Status::Ok);
     let body = res.into_json::<ExchangeRate>().unwrap();
@@ -38,20 +38,20 @@ fn exchange_rates_controller_get_inversed() {
     let (client, mut db) = setup();
 
     let rate = ExchangeRate {
-        base: "USD".to_string(),
         quote: "EUR".to_string(),
+        base: "USD".to_string(),
         rate: 1.19,
     };
 
     let inversed_rate = ExchangeRate {
-        base: "EUR".to_string(),
         quote: "USD".to_string(),
+        base: "EUR".to_string(),
         rate: 1.0 / 1.19,
     };
 
     exchange_rates::insert_or_replace(&mut db, &rate);
 
-    let res = client.get("/exchange_rates?base=EUR&quote=USD").dispatch();
+    let res = client.get("/exchange_rates?quote=USD&base=EUR").dispatch();
 
     assert_eq!(res.status(), Status::Ok);
     let body = res.into_json::<ExchangeRate>().unwrap();
@@ -59,8 +59,50 @@ fn exchange_rates_controller_get_inversed() {
 }
 
 #[test]
+fn exchange_rates_controller_get_indirect() {
+    let (client, mut db) = setup();
+
+    let usd_eur = ExchangeRate {
+        quote: "USD".to_string(),
+        base: "EUR".to_string(),
+        rate: 0.840972163821378,
+    };
+
+    let rub_eur = ExchangeRate {
+        quote: "RUB".to_string(),
+        base: "EUR".to_string(),
+        rate: 0.0115324823898994,
+    };
+
+    exchange_rates::insert_or_replace(&mut db, &usd_eur);
+    exchange_rates::insert_or_replace(&mut db, &rub_eur);
+
+    let rub_usd = ExchangeRate {
+        quote: "RUB".to_string(),
+        base: "USD".to_string(),
+        rate: 0.0115324823898994 / 0.840972163821378,
+    };
+
+    let res = client.get("/exchange_rates?quote=RUB&base=USD").dispatch();
+    assert_eq!(res.status(), Status::Ok);
+    let body = res.into_json::<ExchangeRate>().unwrap();
+    assert_eq!(rub_usd, body);
+
+    let usd_rub = ExchangeRate {
+        quote: "USD".to_string(),
+        base: "RUB".to_string(),
+        rate: 0.840972163821378 / 0.0115324823898994,
+    };
+
+    let res = client.get("/exchange_rates?quote=USD&base=RUB").dispatch();
+    assert_eq!(res.status(), Status::Ok);
+    let body = res.into_json::<ExchangeRate>().unwrap();
+    assert_eq!(usd_rub, body);
+}
+
+#[test]
 fn exchange_rates_controller_get_should_return_404_if_not_found() {
     let (client, _) = setup();
-    let res = client.get("/exchange_rates?base=USD&quote=EUR").dispatch();
+    let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
     assert_eq!(res.status(), Status::NotFound);
 }
