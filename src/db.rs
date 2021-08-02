@@ -110,12 +110,16 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
         println!("Downgrading the schema...");
         let migrations: Vec<Migration> = migrations
             .iter()
-            .filter(|it| it.version <= current_version)
+            .filter(|it| it.version > target_version)
             .cloned()
             .collect();
         println!("Pending migrations found: {}", migrations.len());
         for migr in migrations.iter().rev() {
-            println!("Downgrading schema to version {}", migr.version - 1);
+            println!(
+                "Downgrading schema version from {} to {}",
+                migr.version,
+                migr.version - 1
+            );
             println!("{}", &migr.down.trim());
             conn.execute(&migr.down, []).unwrap();
             conn.execute(&format!("PRAGMA user_version={}", migr.version - 1), [])
