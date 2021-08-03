@@ -22,3 +22,6 @@ features = [ "json" ]
 
 [dependencies.zip]
 version = "0.5"
+
+[dependencies.dotenv]
+version = "0.15.0"

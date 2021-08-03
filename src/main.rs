@@ -7,11 +7,13 @@ mod service;
 mod tests;
 
 use db::{Db, DbVersion};
+use dotenv::dotenv;
 use rocket::{fairing::AdHoc, routes, Build, Rocket};
 use std::{env, process::exit};
 
 #[rocket::main]
 async fn main() {
+    dotenv().ok();
     let args: Vec<String> = env::args().collect();
     cli(&args[1..]).await;
 }

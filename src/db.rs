@@ -205,13 +205,14 @@ async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
                 ecb_fiat_provider.sync(&mut conn).await?;
             }
 
-            let iex_crypto_provider: IexCryptoProvider = conf.extract_inner("providers.crypto.iex")?;
+            let iex_crypto_provider: IexCryptoProvider =
+                conf.extract_inner("providers.crypto.iex")?;
             if iex_crypto_provider.enabled {
                 iex_crypto_provider.sync(&mut conn).await?;
             }
 
             Ok(())
-        },
+        }
         "fiat" => {
             let ecb_fiat_provider: EcbFiatProvider = conf.extract_inner("providers.fiat.ecb")?;
             if ecb_fiat_provider.enabled {
@@ -219,16 +220,20 @@ async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
             }
 
             Ok(())
-        },
+        }
         "crypto" => {
-            let iex_crypto_provider: IexCryptoProvider = conf.extract_inner("providers.crypto.iex")?;
+            let iex_crypto_provider: IexCryptoProvider =
+                conf.extract_inner("providers.crypto.iex")?;
             if iex_crypto_provider.enabled {
                 iex_crypto_provider.sync(&mut conn).await?;
             }
 
             Ok(())
-        },
-        _ => Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Unknown sync target"))),
+        }
+        _ => Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Unknown sync target",
+        ))),
     }
 }
 
