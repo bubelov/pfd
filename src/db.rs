@@ -158,8 +158,8 @@ async fn sync_ecb() -> Result<(), Box<dyn Error>> {
         .iter()
         .zip(rates.iter())
         .map(|(code, rate)| ExchangeRate {
-            base: "EUR".to_string(),
             quote: code.to_string(),
+            base: "EUR".to_string(),
             rate: 1.0 / rate.parse::<f64>().unwrap(),
         })
         .collect();

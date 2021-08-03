@@ -6,8 +6,8 @@ databases.main.url = "rates.db"
 version = 1
 up = """
 CREATE TABLE exchange_rate (
-    base TEXT NOT NULL,
     quote TEXT NOT NULL,
+    base TEXT NOT NULL,
     rate REAL NOT NULL
 )
 """
@@ -15,5 +15,5 @@ down = "DROP TABLE exchange_rate"
 
 [[default.migrations]]
 version = 2
-up = "CREATE UNIQUE INDEX idx_exchange_rate_base_quote ON exchange_rate (base, quote)"
-down = "DROP INDEX idx_exchange_rate_base_quote"
+up = "CREATE UNIQUE INDEX idx_exchange_rate_quote_base ON exchange_rate (quote, base)"
+down = "DROP INDEX idx_exchange_rate_quote_base"
