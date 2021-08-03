@@ -1,6 +1,12 @@
-[default]
-providers.fiat.type = "ecb"
-databases.main.url = "rates.db"
+[default.databases.main]
+url = "rates.db"
+
+[default.providers.fiat.ecb]
+enabled = true
+
+[default.providers.crypto.iex]
+enabled = true
+token = ""
 
 [[default.migrations]]
 version = 1

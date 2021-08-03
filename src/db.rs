@@ -28,9 +28,73 @@ pub struct Migration {
 
 #[derive(Debug, Deserialize)]
 #[serde(crate = "rocket::serde")]
-enum FiatRatesProviderType {
-    #[serde(rename = "ecb")]
-    Ecb,
+struct EcbFiatProvider {
+    enabled: bool,
+}
+
+impl EcbFiatProvider {
+    async fn sync(self, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+        let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
+        let res = reqwest::get(url).await?;
+        let body = Cursor::new(res.bytes().await?);
+        let mut archive = ZipArchive::new(body)?;
+        let mut compressed_csv = archive.by_index(0)?;
+        let mut csv: Vec<u8> = vec![];
+        copy(&mut compressed_csv, &mut csv)?;
+        let csv = String::from_utf8(csv)?;
+        let lines: Vec<&str> = csv.lines().collect();
+        let headers: Vec<&str> = lines[0].strip_suffix(", ").unwrap().split(", ").collect();
+        let codes = &headers[1..];
+        let values: Vec<&str> = lines[1].strip_suffix(", ").unwrap().split(", ").collect();
+        let rates = &values[1..];
+
+        let rates: Vec<ExchangeRate> = codes
+            .iter()
+            .zip(rates.iter())
+            .map(|(code, rate)| ExchangeRate {
+                quote: code.to_string(),
+                base: "EUR".to_string(),
+                rate: 1.0 / rate.parse::<f64>().unwrap(),
+            })
+            .collect();
+
+        for rate in rates {
+            exchange_rates::insert_or_replace(conn, &rate);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct IexCryptoProvider {
+    enabled: bool,
+    token: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct IexCryptoQuote {
+    #[serde(rename = "latestPrice")]
+    latest_price: String,
+}
+
+impl IexCryptoProvider {
+    async fn sync(self, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
+        let url = format!(
+            "https://cloud.iexapis.com/stable/crypto/BTCEUR/quote?token={}",
+            self.token
+        );
+        let quote = reqwest::get(url).await?.json::<IexCryptoQuote>().await?;
+        let rate = ExchangeRate {
+            quote: "BTC".to_string(),
+            base: "EUR".to_string(),
+            rate: quote.latest_price.parse::<f64>()?,
+        };
+        exchange_rates::insert_or_replace(conn, &rate);
+        Ok(())
+    }
 }
 
 pub async fn cli(args: &[String]) {
@@ -43,14 +107,14 @@ pub async fn cli(args: &[String]) {
         "drop" => drop(),
         "migrate" => {
             let conf = Config::figment();
-            let mut conn = connect(&conf);
+            let mut conn = connect();
             let version = match args.get(1) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
                 None => DbVersion::Latest,
             };
             migrate(&conf, &mut conn, version);
         }
-        "sync" => sync().await.unwrap_or_else(|e| {
+        "sync" => sync(&args[1..]).await.unwrap_or_else(|e| {
             println!("Sync failed with error: {:?}", e);
         }),
         _ => {
@@ -128,53 +192,48 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
     }
 }
 
-async fn sync() -> Result<(), Box<dyn Error>> {
+async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let default_target = "all".to_string();
+    let target = args.get(0).unwrap_or(&default_target);
     let conf = Config::figment();
-    let fiat_provider: FiatRatesProviderType = conf.extract_inner("providers.fiat.type")?;
+    let mut conn = connect();
 
-    match fiat_provider {
-        FiatRatesProviderType::Ecb => sync_ecb().await?,
+    match target.as_str() {
+        "all" => {
+            let ecb_fiat_provider: EcbFiatProvider = conf.extract_inner("providers.fiat.ecb")?;
+            if ecb_fiat_provider.enabled {
+                ecb_fiat_provider.sync(&mut conn).await?;
+            }
+
+            let iex_crypto_provider: IexCryptoProvider = conf.extract_inner("providers.crypto.iex")?;
+            if iex_crypto_provider.enabled {
+                iex_crypto_provider.sync(&mut conn).await?;
+            }
+
+            Ok(())
+        },
+        "fiat" => {
+            let ecb_fiat_provider: EcbFiatProvider = conf.extract_inner("providers.fiat.ecb")?;
+            if ecb_fiat_provider.enabled {
+                ecb_fiat_provider.sync(&mut conn).await?;
+            }
+
+            Ok(())
+        },
+        "crypto" => {
+            let iex_crypto_provider: IexCryptoProvider = conf.extract_inner("providers.crypto.iex")?;
+            if iex_crypto_provider.enabled {
+                iex_crypto_provider.sync(&mut conn).await?;
+            }
+
+            Ok(())
+        },
+        _ => Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Unknown sync target"))),
     }
-
-    Ok(())
 }
 
-async fn sync_ecb() -> Result<(), Box<dyn Error>> {
-    let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
-    let res = reqwest::get(url).await?;
-    let body = Cursor::new(res.bytes().await?);
-    let mut archive = ZipArchive::new(body)?;
-    let mut compressed_csv = archive.by_index(0)?;
-    let mut csv: Vec<u8> = vec![];
-    copy(&mut compressed_csv, &mut csv)?;
-    let csv = String::from_utf8(csv)?;
-    let lines: Vec<&str> = csv.lines().collect();
-    let headers: Vec<&str> = lines[0].strip_suffix(", ").unwrap().split(", ").collect();
-    let codes = &headers[1..];
-    let values: Vec<&str> = lines[1].strip_suffix(", ").unwrap().split(", ").collect();
-    let rates = &values[1..];
-
-    let rates: Vec<ExchangeRate> = codes
-        .iter()
-        .zip(rates.iter())
-        .map(|(code, rate)| ExchangeRate {
-            quote: code.to_string(),
-            base: "EUR".to_string(),
-            rate: 1.0 / rate.parse::<f64>().unwrap(),
-        })
-        .collect();
-
+pub fn connect() -> Connection {
     let conf = Config::figment();
-    let mut conn = connect(&conf);
-
-    for rate in rates {
-        exchange_rates::insert_or_replace(&mut conn, &rate);
-    }
-
-    Ok(())
-}
-
-pub fn connect(conf: &Figment) -> Connection {
     let url = conf.find_value("databases.main.url").unwrap();
     let url = url.as_str().unwrap();
     Connection::open(url).unwrap()
