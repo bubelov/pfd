@@ -28,7 +28,7 @@ pub struct Migration {
 
 #[derive(Debug, Deserialize)]
 #[serde(crate = "rocket::serde")]
-enum RatesProvider {
+enum FiatRatesProviderType {
     #[serde(rename = "ecb")]
     Ecb,
 }
@@ -130,10 +130,10 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
 
 async fn sync() -> Result<(), Box<dyn Error>> {
     let conf = Config::figment();
-    let provider: RatesProvider = conf.extract_inner("provider")?;
+    let fiat_provider: FiatRatesProviderType = conf.extract_inner("providers.fiat.type")?;
 
-    match provider {
-        RatesProvider::Ecb => sync_ecb().await?,
+    match fiat_provider {
+        FiatRatesProviderType::Ecb => sync_ecb().await?,
     }
 
     Ok(())

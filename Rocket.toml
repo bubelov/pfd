@@ -1,5 +1,5 @@
 [default]
-provider = "ecb"
+providers.fiat.type = "ecb"
 databases.main.url = "rates.db"
 
 [[default.migrations]]
