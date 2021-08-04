@@ -90,7 +90,7 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
         for migr in migrations {
             println!("Updating schema to version {}", migr.version);
             println!("{}", &migr.up.trim());
-            conn.execute(&migr.up, []).unwrap();
+            conn.execute_batch(&migr.up).unwrap();
             conn.execute(&format!("PRAGMA user_version={}", migr.version), [])
                 .unwrap();
         }
@@ -109,7 +109,7 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
                 migr.version - 1
             );
             println!("{}", &migr.down.trim());
-            conn.execute(&migr.down, []).unwrap();
+            conn.execute_batch(&migr.down).unwrap();
             conn.execute(&format!("PRAGMA user_version={}", migr.version - 1), [])
                 .unwrap();
         }
