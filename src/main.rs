@@ -1,6 +1,7 @@
 mod controller;
 mod db;
 mod model;
+mod provider;
 mod repository;
 mod service;
 #[cfg(test)]

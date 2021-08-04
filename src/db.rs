@@ -1,14 +1,9 @@
-use crate::{model::ExchangeRate, repository::exchange_rates};
+use crate::provider::{EcbFiatProvider, IexCryptoProvider};
+use futures::join;
 use rocket::{figment::Figment, serde::Deserialize, Config};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::{
-    error::Error,
-    fs::remove_file,
-    io::{copy, Cursor},
-    process::exit,
-};
-use zip::ZipArchive;
+use std::{error::Error, fs::remove_file, process::exit};
 
 #[database("main")]
 pub struct Db(Connection);
@@ -24,77 +19,6 @@ pub struct Migration {
     version: i16,
     up: String,
     down: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct EcbFiatProvider {
-    enabled: bool,
-}
-
-impl EcbFiatProvider {
-    async fn sync(self, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
-        let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
-        let res = reqwest::get(url).await?;
-        let body = Cursor::new(res.bytes().await?);
-        let mut archive = ZipArchive::new(body)?;
-        let mut compressed_csv = archive.by_index(0)?;
-        let mut csv: Vec<u8> = vec![];
-        copy(&mut compressed_csv, &mut csv)?;
-        let csv = String::from_utf8(csv)?;
-        let lines: Vec<&str> = csv.lines().collect();
-        let headers: Vec<&str> = lines[0].strip_suffix(", ").unwrap().split(", ").collect();
-        let codes = &headers[1..];
-        let values: Vec<&str> = lines[1].strip_suffix(", ").unwrap().split(", ").collect();
-        let rates = &values[1..];
-
-        let rates: Vec<ExchangeRate> = codes
-            .iter()
-            .zip(rates.iter())
-            .map(|(code, rate)| ExchangeRate {
-                quote: code.to_string(),
-                base: "EUR".to_string(),
-                rate: 1.0 / rate.parse::<f64>().unwrap(),
-            })
-            .collect();
-
-        for rate in rates {
-            exchange_rates::insert_or_replace(conn, &rate);
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct IexCryptoProvider {
-    enabled: bool,
-    token: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct IexCryptoQuote {
-    #[serde(rename = "latestPrice")]
-    latest_price: String,
-}
-
-impl IexCryptoProvider {
-    async fn sync(self, conn: &mut Connection) -> Result<(), Box<dyn Error>> {
-        let url = format!(
-            "https://cloud.iexapis.com/stable/crypto/BTCEUR/quote?token={}",
-            self.token
-        );
-        let quote = reqwest::get(url).await?.json::<IexCryptoQuote>().await?;
-        let rate = ExchangeRate {
-            quote: "BTC".to_string(),
-            base: "EUR".to_string(),
-            rate: quote.latest_price.parse::<f64>()?,
-        };
-        exchange_rates::insert_or_replace(conn, &rate);
-        Ok(())
-    }
 }
 
 pub async fn cli(args: &[String]) {
@@ -196,36 +120,36 @@ async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
     let default_target = "all".to_string();
     let target = args.get(0).unwrap_or(&default_target);
     let conf = Config::figment();
-    let mut conn = connect();
+
+    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect());
+    let mut iex_crypto = IexCryptoProvider::new(&conf, connect());
 
     match target.as_str() {
+        "schedule" => {
+            join!(ecb_fiat.schedule(), iex_crypto.schedule());
+            Ok(())
+        }
         "all" => {
-            let ecb_fiat_provider: EcbFiatProvider = conf.extract_inner("providers.fiat.ecb")?;
-            if ecb_fiat_provider.enabled {
-                ecb_fiat_provider.sync(&mut conn).await?;
+            if ecb_fiat.conf.enabled {
+                ecb_fiat.sync().await?;
             }
 
-            let iex_crypto_provider: IexCryptoProvider =
-                conf.extract_inner("providers.crypto.iex")?;
-            if iex_crypto_provider.enabled {
-                iex_crypto_provider.sync(&mut conn).await?;
+            if iex_crypto.conf.enabled {
+                iex_crypto.sync().await?;
             }
 
             Ok(())
         }
         "fiat" => {
-            let ecb_fiat_provider: EcbFiatProvider = conf.extract_inner("providers.fiat.ecb")?;
-            if ecb_fiat_provider.enabled {
-                ecb_fiat_provider.sync(&mut conn).await?;
+            if ecb_fiat.conf.enabled {
+                ecb_fiat.sync().await?;
             }
 
             Ok(())
         }
         "crypto" => {
-            let iex_crypto_provider: IexCryptoProvider =
-                conf.extract_inner("providers.crypto.iex")?;
-            if iex_crypto_provider.enabled {
-                iex_crypto_provider.sync(&mut conn).await?;
+            if iex_crypto.conf.enabled {
+                iex_crypto.sync().await?;
             }
 
             Ok(())
