@@ -9,7 +9,8 @@ mod tests;
 
 use db::{Db, DbVersion};
 use dotenv::dotenv;
-use rocket::{fairing::AdHoc, routes, Build, Rocket};
+use model::Error;
+use rocket::{catch, catchers, fairing::AdHoc, http::Status, routes, Build, Request, Rocket};
 use std::{env, process::exit};
 
 #[rocket::main]
@@ -40,6 +41,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
         .mount("/", routes![controller::exchange_rates::get])
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
+        .register("/", catchers![default_catcher])
 }
 
 async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
@@ -48,4 +50,9 @@ async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
     db.run(move |conn| db::migrate(&conf, conn, DbVersion::Latest))
         .await;
     rocket
+}
+
+#[catch(default)]
+fn default_catcher(status: Status, _request: &Request) -> Error {
+    Error::new(status.code, "")
 }

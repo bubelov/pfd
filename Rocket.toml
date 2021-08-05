@@ -24,3 +24,13 @@ down = "DROP TABLE exchange_rate"
 version = 2
 up = "CREATE UNIQUE INDEX idx_exchange_rate_quote_base ON exchange_rate (quote, base)"
 down = "DROP INDEX idx_exchange_rate_quote_base"
+
+[[default.migrations]]
+version = 3
+up = """
+CREATE TABLE user (
+    id TEXT PRIMARY KEY
+);
+INSERT INTO user (id) VALUES ('91c12d49-8577-4f42-b49d-0a0cfcfa1b85');
+"""
+down = "DROP TABLE user"
