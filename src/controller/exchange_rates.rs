@@ -3,7 +3,7 @@ use crate::{
     model::{Error, ExchangeRate, User},
     service::exchange_rates,
 };
-use rocket::{get, serde::json::Json};
+use rocket::{get, http::Status, serde::json::Json};
 
 #[get("/exchange_rates?<quote>&<base>")]
 pub async fn get(
@@ -15,11 +15,8 @@ pub async fn get(
     match exchange_rates::get(quote, base, db).await {
         Ok(v) => match v {
             Some(v) => Ok(Json(v)),
-            None => Err(Error::new(404, "Not found")),
+            None => Err(Error::short(Status::NotFound)),
         },
-        Err(e) => {
-            eprintln!("{}", e);
-            Err(Error::new(500, "Internal server error"))
-        }
+        Err(e) => Err(Error::full(Status::InternalServerError, e)),
     }
 }

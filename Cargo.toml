@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2018"
 publish = false
 
+[dependencies]
+color-eyre = "0.5.11"
+tracing = "0.1.26"
+tracing-subscriber = "0.2.19"
+
 [dependencies.rocket]
 version = "0.5.0-rc.1"
 features = [ "json" ]

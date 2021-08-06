@@ -1,15 +1,14 @@
 use crate::{model::ExchangeRate, repository::exchange_rates};
 use chrono::Utc;
+use color_eyre::Report;
 use cron::Schedule;
 use rocket::figment::Figment;
 use rocket::serde::Deserialize;
 use rusqlite::Connection;
+use std::io::{copy, Cursor};
 use std::str::FromStr;
-use std::{
-    error::Error,
-    io::{copy, Cursor},
-};
 use tokio::time::sleep;
+use tracing::warn;
 use zip::ZipArchive;
 
 pub struct EcbFiatProvider {
@@ -25,38 +24,38 @@ pub struct EcbFiatProviderConf {
 }
 
 impl EcbFiatProvider {
-    pub fn new(conf: &Figment, conn: Connection) -> EcbFiatProvider {
-        let conf: EcbFiatProviderConf = conf.extract_inner("providers.fiat.ecb").unwrap();
+    pub fn new(conf: &Figment, conn: Connection) -> Result<EcbFiatProvider, Report> {
+        let conf: EcbFiatProviderConf = conf.extract_inner("providers.fiat.ecb")?;
 
-        EcbFiatProvider {
+        Ok(EcbFiatProvider {
             conf: conf,
             conn: conn,
-        }
+        })
     }
 
     pub async fn schedule(&mut self) {
-        println!("Scheduling sync...");
+        warn!(provider = "ecb", "Scheduling sync...");
         let schedule = Schedule::from_str(&self.conf.schedule).unwrap();
 
         for next_sync in schedule.upcoming(Utc) {
-            println!("Next sync: {}", next_sync);
+            warn!(provider = "ecb", %next_sync, "Got next sync date");
             let time_to_next_sync = next_sync.signed_duration_since(Utc::now());
             if time_to_next_sync.num_nanoseconds().unwrap() < 0 {
-                println!("Skipping next sync because the old one didn't finish in time");
+                warn!("Skipping next sync because the old one didn't finish in time");
                 continue;
             }
             let time_to_next_sync = time_to_next_sync.to_std().unwrap();
-            println!(
-                "Time to next sync in seconds {}",
-                time_to_next_sync.as_secs()
+            warn!(
+                secs_to_next_sync = time_to_next_sync.as_secs(),
+                "Going to sleep till next sync"
             );
             sleep(time_to_next_sync).await;
-            println!("Syncing...");
+            warn!("Syncing...");
             self.sync().await.unwrap();
         }
     }
 
-    pub async fn sync(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn sync(&mut self) -> Result<(), Report> {
         let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
         let res = reqwest::get(url).await?;
         let body = Cursor::new(res.bytes().await?);
@@ -82,7 +81,7 @@ impl EcbFiatProvider {
             .collect();
 
         for rate in rates {
-            exchange_rates::insert_or_replace(&mut self.conn, &rate);
+            exchange_rates::insert_or_replace(&mut self.conn, &rate)?;
         }
 
         Ok(())

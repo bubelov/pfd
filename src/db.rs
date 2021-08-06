@@ -1,13 +1,16 @@
 use crate::provider::{EcbFiatProvider, IexCryptoProvider};
+use color_eyre::Report;
 use futures::join;
 use rocket::{figment::Figment, serde::Deserialize, Config};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use std::{error::Error, fs::remove_file, process::exit};
+use std::{fs::remove_file, process::exit};
+use tracing::{error, info, warn};
 
 #[database("main")]
 pub struct Db(Connection);
 
+#[derive(Debug)]
 pub enum DbVersion {
     Specific(i16),
     Latest,
@@ -23,46 +26,64 @@ pub struct Migration {
 
 pub async fn cli(args: &[String]) {
     let action = args.get(0).unwrap_or_else(|| {
-        println!("Database action is not specified");
+        error!(?args, "Database action is not specified");
         exit(1);
     });
 
     match action.as_str() {
-        "drop" => drop(),
+        "drop" => drop().unwrap_or_else(|e| {
+            error!(%e, "Unable drop database");
+            exit(1);
+        }),
         "migrate" => {
             let conf = Config::figment();
-            let mut conn = connect();
+            let mut conn = connect().unwrap_or_else(|e| {
+                error!(%e, "Can't connect to database");
+                exit(1);
+            });
             let version = match args.get(1) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
                 None => DbVersion::Latest,
             };
-            migrate(&conf, &mut conn, version);
+            migrate(&conf, &mut conn, version).unwrap_or_else(|e| {
+                error!(%e, "Migration failed");
+                exit(1);
+            });
         }
         "sync" => sync(&args[1..]).await.unwrap_or_else(|e| {
-            println!("Sync failed with error: {:?}", e);
+            error!(%e, "Sync failed");
+            exit(1);
         }),
         _ => {
-            println!("Unknown action: {}", action);
+            error!(%action, ?args, "Unknown action");
             exit(1);
         }
     };
 }
 
-fn drop() {
-    println!("Dropping database...");
-    let db = Config::figment().find_value("databases.main.url").unwrap();
-    let db = db.as_str().unwrap();
-    println!("Database URL: {:?}", db);
-    remove_file(db).unwrap();
-    println!("Database has been dropped");
+fn drop() -> Result<(), Report> {
+    info!("Dropping database...");
+    let path = Config::figment().find_value("databases.main.url")?;
+    let path = path.as_str().ok_or(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Invalid database path",
+    ))?;
+    info!(%path, "Found db path");
+    remove_file(path)?;
+    info!("Database has been dropped");
+    Ok(())
 }
 
-pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion) {
-    let current_version = schema_version(conn).unwrap();
-    println!("Current schema version: {}", current_version);
+pub fn migrate(
+    conf: &Figment,
+    conn: &mut Connection,
+    target_version: DbVersion,
+) -> Result<(), Report> {
+    let current_version = schema_version(conn)?;
+    info!(?current_version, ?target_version, "Migrating db schema");
 
-    let migrations: Vec<Migration> = conf.extract_inner("migrations").unwrap();
-    println!("Migrations found: {}", migrations.len());
+    let migrations: Vec<Migration> = conf.extract_inner("migrations")?;
+    info!(count = migrations.len(), "Loaded migrations");
 
     let target_version = match target_version {
         DbVersion::Latest => {
@@ -75,54 +96,51 @@ pub fn migrate(conf: &Figment, conn: &mut Connection, target_version: DbVersion)
         DbVersion::Specific(v) => v,
     };
 
-    println!("Target version: {}", target_version);
-
     if current_version == target_version {
-        println!("Schema is up to date");
+        info!("Schema is up to date");
     } else if current_version < target_version {
-        println!("Schema is outdated, updating...");
+        info!("Schema is outdated, updating...");
         let migrations: Vec<Migration> = migrations
             .iter()
             .filter(|it| it.version > current_version)
             .cloned()
             .collect();
-        println!("Pending migrations found: {}", migrations.len());
+        warn!(count = migrations.len(), "Found pending migrations");
         for migr in migrations {
-            println!("Updating schema to version {}", migr.version);
-            println!("{}", &migr.up.trim());
-            conn.execute_batch(&migr.up).unwrap();
-            conn.execute(&format!("PRAGMA user_version={}", migr.version), [])
-                .unwrap();
+            info!(%migr.version, sql = &migr.up.trim(), "Updating schema");
+            conn.execute_batch(&migr.up)?;
+            conn.execute_batch(&format!("PRAGMA user_version={}", migr.version))?;
         }
     } else {
-        println!("Downgrading the schema...");
+        info!("Downgrading the schema...");
         let migrations: Vec<Migration> = migrations
             .iter()
             .filter(|it| it.version > target_version)
             .cloned()
             .collect();
-        println!("Pending migrations found: {}", migrations.len());
+        warn!(count = migrations.len(), "Found pending migrations");
         for migr in migrations.iter().rev() {
-            println!(
-                "Downgrading schema version from {} to {}",
-                migr.version,
-                migr.version - 1
+            info!(
+                from = migr.version,
+                to = migr.version - 1,
+                sql = &migr.down.trim(),
+                "Downgrading schema"
             );
-            println!("{}", &migr.down.trim());
-            conn.execute_batch(&migr.down).unwrap();
-            conn.execute(&format!("PRAGMA user_version={}", migr.version - 1), [])
-                .unwrap();
+            conn.execute_batch(&migr.down)?;
+            conn.execute_batch(&format!("PRAGMA user_version={}", migr.version - 1))?;
         }
     }
+
+    Ok(())
 }
 
-async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
+async fn sync(args: &[String]) -> Result<(), Report> {
     let default_target = "all".to_string();
     let target = args.get(0).unwrap_or(&default_target);
     let conf = Config::figment();
 
-    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect());
-    let mut iex_crypto = IexCryptoProvider::new(&conf, connect());
+    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect()?)?;
+    let mut iex_crypto = IexCryptoProvider::new(&conf, connect()?)?;
 
     match target.as_str() {
         "schedule" => {
@@ -154,18 +172,21 @@ async fn sync(args: &[String]) -> Result<(), Box<dyn Error>> {
 
             Ok(())
         }
-        _ => Err(Box::new(std::io::Error::new(
+        _ => Err(Report::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             "Unknown sync target",
         ))),
     }
 }
 
-pub fn connect() -> Connection {
+pub fn connect() -> Result<Connection, Report> {
     let conf = Config::figment();
-    let url = conf.find_value("databases.main.url").unwrap();
-    let url = url.as_str().unwrap();
-    Connection::open(url).unwrap()
+    let path = conf.find_value("databases.main.url")?;
+    let path = path.as_str().ok_or(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Invalid database path",
+    ))?;
+    Ok(Connection::open(path)?)
 }
 
 fn schema_version(conn: &Connection) -> rusqlite::Result<i16> {

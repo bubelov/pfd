@@ -2,10 +2,10 @@ use crate::model::User;
 use rusqlite::{params, Connection, Error, OptionalExtension};
 
 #[allow(dead_code)]
-pub fn insert_or_replace(conn: &mut Connection, row: &User) {
+pub fn insert_or_replace(conn: &mut Connection, row: &User) -> Result<usize, Error> {
     let query = "INSERT OR REPLACE INTO user (id) VALUES (?)";
     let params = params![&row.id];
-    conn.execute(query, params).unwrap();
+    conn.execute(query, params)
 }
 
 #[allow(dead_code)]

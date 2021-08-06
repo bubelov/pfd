@@ -1,5 +1,6 @@
 use crate::db::Db;
 use crate::service::users;
+use color_eyre::Report;
 use rocket::{
     async_trait,
     http::{ContentType, Status},
@@ -9,6 +10,7 @@ use rocket::{
     serde::{Deserialize, Serialize},
 };
 use std::io::Cursor;
+use tracing::error;
 
 pub struct User {
     pub id: String,
@@ -53,18 +55,29 @@ pub struct ExchangeRate {
     pub rate: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Error {
     pub code: u16,
     pub message: String,
+    #[serde(skip_serializing)]
+    pub report: Option<Report>,
 }
 
 impl Error {
-    pub fn new(code: u16, message: &str) -> Error {
+    pub fn short(status: Status) -> Error {
         Error {
-            code: code,
-            message: message.to_string(),
+            code: status.code,
+            message: status.reason().unwrap().to_string(),
+            report: None,
+        }
+    }
+
+    pub fn full(status: Status, report: Report) -> Error {
+        Error {
+            code: status.code,
+            message: status.reason().unwrap().to_string(),
+            report: Some(report),
         }
     }
 }
@@ -72,6 +85,10 @@ impl Error {
 #[async_trait]
 impl<'r> Responder<'r, 'static> for Error {
     fn respond_to(self, _: &'r Request<'_>) -> response::Result<'static> {
+        if let Some(report) = self.report {
+            error!(%report, "Error from controller");
+        }
+
         let body = format!(
             "{{\"code\": {}, \"message\": \"{}\"}}",
             self.code, self.message

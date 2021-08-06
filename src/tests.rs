@@ -1,17 +1,52 @@
-use crate::{model::ExchangeRate, prepare, repository::exchange_rates};
-use rocket::{http::Status, local::blocking::Client};
+use crate::{
+    model::{ExchangeRate, User},
+    prepare,
+    repository::{exchange_rates, users},
+};
+use rocket::{
+    fairing::AdHoc,
+    http::{Header, Status},
+    local::blocking::Client,
+};
 use rusqlite::Connection;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
+static USER_ID: &str = "test";
+
 fn setup() -> (Client, Connection) {
+    let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let db_url = format!("file::testdb_{}:?mode=memory&cache=shared", db_name);
+    let conf = rocket::Config::figment().merge(("databases.main.url", &db_url));
+    let mut conn = Connection::open(&db_url).unwrap();
+    let rocket = prepare(rocket::custom(&conf)).attach(AdHoc::on_request("Authorize", |req, _| {
+        Box::pin(async move {
+            req.add_header(Header::new("Authorization", format!("Bearer {}", USER_ID)));
+        })
+    }));
+    let client = Client::untracked(rocket).unwrap();
+    let user = User {
+        id: USER_ID.to_string(),
+    };
+    users::insert_or_replace(&mut conn, &user).unwrap();
+    (client, conn)
+}
+
+fn setup_without_auth() -> Client {
     let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
     let db_url = format!("file::testdb_{}:?mode=memory&cache=shared", db_name);
     let conf = rocket::Config::figment().merge(("databases.main.url", &db_url));
     let rocket = prepare(rocket::custom(&conf));
     let client = Client::untracked(rocket).unwrap();
-    (client, Connection::open(db_url).unwrap())
+    client
+}
+
+#[test]
+fn exchange_rates_controller_get_unauthorized() {
+    let client = setup_without_auth();
+    let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
+    assert_eq!(res.status(), Status::Unauthorized);
 }
 
 #[test]
@@ -24,7 +59,7 @@ fn exchange_rates_controller_get() {
         rate: 1.25,
     };
 
-    exchange_rates::insert_or_replace(&mut db, &rate);
+    exchange_rates::insert_or_replace(&mut db, &rate).unwrap();
 
     let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
 
@@ -49,7 +84,7 @@ fn exchange_rates_controller_get_inversed() {
         rate: 1.0 / 1.19,
     };
 
-    exchange_rates::insert_or_replace(&mut db, &rate);
+    exchange_rates::insert_or_replace(&mut db, &rate).unwrap();
 
     let res = client.get("/exchange_rates?quote=USD&base=EUR").dispatch();
 
@@ -74,8 +109,8 @@ fn exchange_rates_controller_get_indirect() {
         rate: 0.0115324823898994,
     };
 
-    exchange_rates::insert_or_replace(&mut db, &usd_eur);
-    exchange_rates::insert_or_replace(&mut db, &rub_eur);
+    exchange_rates::insert_or_replace(&mut db, &usd_eur).unwrap();
+    exchange_rates::insert_or_replace(&mut db, &rub_eur).unwrap();
 
     let rub_usd = ExchangeRate {
         quote: "RUB".to_string(),

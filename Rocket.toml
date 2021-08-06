@@ -1,3 +1,7 @@
+[default]
+cli_colors = false
+log_level = "off"
+
 [default.databases.main]
 url = "rates.db"
 
