@@ -1064,6 +1064,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pfd"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "color-eyre",
+ "cron",
+ "dotenv",
+ "futures",
+ "reqwest",
+ "rocket",
+ "rocket_sync_db_pools",
+ "rusqlite",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zip",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1325,25 +1344,6 @@ dependencies = [
  "ubyte",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "rocket-rates"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "color-eyre",
- "cron",
- "dotenv",
- "futures",
- "reqwest",
- "rocket",
- "rocket_sync_db_pools",
- "rusqlite",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "zip",
 ]
 
 [[package]]
