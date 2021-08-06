@@ -141,3 +141,11 @@ fn exchange_rates_controller_get_should_return_404_if_not_found() {
     let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
     assert_eq!(res.status(), Status::NotFound);
 }
+
+#[test]
+fn exchange_rates_controller_get_should_return_500_if_sql_query_fails() {
+    let (client, db) = setup();
+    db.execute_batch("DROP TABLE exchange_rate").unwrap();
+    let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
+    assert_eq!(res.status(), Status::InternalServerError);
+}

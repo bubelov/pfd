@@ -7,7 +7,10 @@ use rocket::{
     outcome::try_outcome,
     request::{FromRequest, Outcome, Request},
     response::{self, Responder, Response},
-    serde::{Deserialize, Serialize},
+    serde::{
+        json::Json,
+        {Deserialize, Serialize},
+    },
 };
 use std::io::Cursor;
 use tracing::error;
@@ -99,5 +102,24 @@ impl<'r> Responder<'r, 'static> for Error {
             .status(Status::new(self.code))
             .sized_body(body.len(), Cursor::new(body))
             .ok()
+    }
+}
+
+#[derive(Responder)]
+#[response(bound = "T: Serialize")]
+pub enum ApiResult<T> {
+    Ok(Json<T>),
+    Err(Error),
+}
+
+impl<T> ApiResult<T> {
+    pub fn new(result: Result<Option<T>, Report>) -> ApiResult<T> {
+        match result {
+            Ok(opt) => match opt {
+                Some(val) => ApiResult::Ok(Json(val)),
+                None => ApiResult::Err(Error::short(Status::NotFound)),
+            },
+            Err(e) => ApiResult::Err(Error::full(Status::InternalServerError, e)),
+        }
     }
 }
