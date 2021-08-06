@@ -11,12 +11,9 @@ pub async fn get(
     base: &str,
     db: Db,
     _user: User,
-) -> Result<Json<ExchangeRate>, Error> {
-    match exchange_rates::get(quote, base, db).await {
-        Ok(v) => match v {
-            Some(v) => Ok(Json(v)),
-            None => Err(Error::short(Status::NotFound)),
-        },
-        Err(e) => Err(Error::full(Status::InternalServerError, e)),
-    }
+) -> Result<Option<Json<ExchangeRate>>, Error> {
+    exchange_rates::get_by_quote_and_base(quote, base, db)
+        .await
+        .map(|opt| opt.map(|v| Json(v)))
+        .map_err(|e| Error::full(Status::InternalServerError, e))
 }

@@ -1,7 +1,11 @@
 use crate::{db::Db, model::ExchangeRate, repository::exchange_rates};
 use color_eyre::Report;
 
-pub async fn get(quote: &str, base: &str, db: Db) -> Result<Option<ExchangeRate>, Report> {
+pub async fn get_by_quote_and_base(
+    quote: &str,
+    base: &str,
+    db: Db,
+) -> Result<Option<ExchangeRate>, Report> {
     let quote_owned = quote.to_string();
     let base_owned = base.to_string();
 
