@@ -12,8 +12,9 @@ use color_eyre::Report;
 use db::{Db, DbVersion};
 use dotenv::dotenv;
 use rocket::{catch, catchers, fairing::AdHoc, http::Status, routes, Build, Request, Rocket};
+use std::path::Path;
 use std::{env, process::exit};
-use tracing::error;
+use tracing::{error, warn};
 use tracing_subscriber::EnvFilter;
 
 #[rocket::main]
@@ -37,6 +38,22 @@ fn setup() -> Result<(), Report> {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
+
+    if env::var("DATA_DIR").is_err() {
+        let mut dir = dirs::home_dir().unwrap();
+        dir.push(".pfd");
+        env::set_var("DATA_DIR", dir.to_str().unwrap());
+    }
+
+    let data_dir = env::var("DATA_DIR").unwrap();
+    let data_dir = Path::new(&data_dir);
+
+    if !data_dir.exists() {
+        warn!(data_dir = ?data_dir.to_str(), "Data dir does not exist, creating");
+        std::fs::create_dir_all(data_dir).unwrap();
+    } else {
+        warn!(data_dir = ?data_dir.to_str(), "Set data dir");
+    }
 
     Ok(())
 }
