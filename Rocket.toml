@@ -1,10 +1,3 @@
-[default]
-cli_colors = false
-log_level = "off"
-
-[default.databases.main]
-url = "rates.db"
-
 [default.providers.fiat.ecb]
 enabled = true
 schedule = "0 0 14 * * * *"

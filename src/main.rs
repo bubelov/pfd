@@ -11,7 +11,9 @@ use crate::model::Error;
 use color_eyre::Report;
 use db::{Db, DbVersion};
 use dotenv::dotenv;
-use rocket::{catch, catchers, fairing::AdHoc, http::Status, routes, Build, Request, Rocket};
+use rocket::{
+    catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
+};
 use std::path::Path;
 use std::{env, process::exit};
 use tracing::{error, warn};
@@ -64,9 +66,17 @@ async fn cli(args: &[String]) {
         exit(1);
     });
 
+    let db_url = env::var("DATA_DIR").unwrap();
+    let db_url = Path::new(&db_url).join("pfd.db");
+
+    let conf = Config::figment()
+        .merge(("databases.main.url", db_url.to_str()))
+        .merge(("cli_colors", false))
+        .merge(("log_level", "off"));
+
     match action.as_str() {
-        "db" => db::cli(&args[1..]).await,
-        "serve" => prepare(rocket::build()).launch().await.unwrap(),
+        "db" => db::cli(&args[1..], &conf).await,
+        "serve" => prepare(rocket::custom(conf)).launch().await.unwrap(),
         _ => {
             error!(%action, ?args, "Unknown action");
             exit(1);

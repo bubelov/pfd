@@ -1,7 +1,7 @@
 use crate::provider::{EcbFiatProvider, IexCryptoProvider};
 use color_eyre::Report;
 use futures::join;
-use rocket::{figment::Figment, serde::Deserialize, Config};
+use rocket::{figment::Figment, serde::Deserialize};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
 use std::{fs::remove_file, process::exit};
@@ -24,20 +24,19 @@ pub struct Migration {
     down: String,
 }
 
-pub async fn cli(args: &[String]) {
+pub async fn cli(args: &[String], conf: &Figment) {
     let action = args.get(0).unwrap_or_else(|| {
         error!(?args, "Database action is not specified");
         exit(1);
     });
 
     match action.as_str() {
-        "drop" => drop().unwrap_or_else(|e| {
+        "drop" => drop(conf).unwrap_or_else(|e| {
             error!(%e, "Unable drop database");
             exit(1);
         }),
         "migrate" => {
-            let conf = Config::figment();
-            let mut conn = connect().unwrap_or_else(|e| {
+            let mut conn = connect(conf).unwrap_or_else(|e| {
                 error!(%e, "Can't connect to database");
                 exit(1);
             });
@@ -45,12 +44,12 @@ pub async fn cli(args: &[String]) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
                 None => DbVersion::Latest,
             };
-            migrate(&conf, &mut conn, version).unwrap_or_else(|e| {
+            migrate(conf, &mut conn, version).unwrap_or_else(|e| {
                 error!(%e, "Migration failed");
                 exit(1);
             });
         }
-        "sync" => sync(&args[1..]).await.unwrap_or_else(|e| {
+        "sync" => sync(&args[1..], conf).await.unwrap_or_else(|e| {
             error!(%e, "Sync failed");
             exit(1);
         }),
@@ -61,9 +60,9 @@ pub async fn cli(args: &[String]) {
     };
 }
 
-fn drop() -> Result<(), Report> {
+fn drop(conf: &Figment) -> Result<(), Report> {
     info!("Dropping database...");
-    let path = Config::figment().find_value("databases.main.url")?;
+    let path = conf.find_value("databases.main.url")?;
     let path = path.as_str().ok_or(std::io::Error::new(
         std::io::ErrorKind::Other,
         "Invalid database path",
@@ -134,13 +133,12 @@ pub fn migrate(
     Ok(())
 }
 
-async fn sync(args: &[String]) -> Result<(), Report> {
+async fn sync(args: &[String], conf: &Figment) -> Result<(), Report> {
     let default_target = "all".to_string();
     let target = args.get(0).unwrap_or(&default_target);
-    let conf = Config::figment();
 
-    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect()?)?;
-    let mut iex_crypto = IexCryptoProvider::new(&conf, connect()?)?;
+    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect(&conf)?)?;
+    let mut iex_crypto = IexCryptoProvider::new(&conf, connect(&conf)?)?;
 
     match target.as_str() {
         "schedule" => {
@@ -179,8 +177,7 @@ async fn sync(args: &[String]) -> Result<(), Report> {
     }
 }
 
-pub fn connect() -> Result<Connection, Report> {
-    let conf = Config::figment();
+pub fn connect(conf: &Figment) -> Result<Connection, Report> {
     let path = conf.find_value("databases.main.url")?;
     let path = path.as_str().ok_or(std::io::Error::new(
         std::io::ErrorKind::Other,
