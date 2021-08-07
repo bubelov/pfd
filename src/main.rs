@@ -7,10 +7,10 @@ mod service;
 #[cfg(test)]
 mod tests;
 
+use crate::model::Error;
 use color_eyre::Report;
 use db::{Db, DbVersion};
 use dotenv::dotenv;
-use model::Error;
 use rocket::{catch, catchers, fairing::AdHoc, http::Status, routes, Build, Request, Rocket};
 use std::{env, process::exit};
 use tracing::error;
