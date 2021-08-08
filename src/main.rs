@@ -17,46 +17,61 @@ use rocket::{
 use std::path::Path;
 use std::{env, process::exit};
 use tracing::{error, warn};
+use tracing_log::AsLog;
+use tracing_subscriber::fmt::Layer;
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::Registry;
 
 #[rocket::main]
 async fn main() -> Result<(), Report> {
     dotenv().ok();
-    setup()?;
-    let args: Vec<String> = env::args().collect();
-    cli(&args[1..]).await;
-    Ok(())
-}
 
-fn setup() -> Result<(), Report> {
     if env::var("RUST_LIB_BACKTRACE").is_err() {
         env::set_var("RUST_LIB_BACKTRACE", "1")
     }
+
     color_eyre::install()?;
+
+    if env::var("DATA_DIR").is_err() {
+        let dir = dirs::home_dir().unwrap().join(".pfd");
+        env::set_var("DATA_DIR", dir.to_str().unwrap());
+    }
+
+    let data_dir = env::var("DATA_DIR")?;
+    let data_dir = Path::new(&data_dir);
+
+    if !data_dir.exists() {
+        std::fs::create_dir_all(data_dir).unwrap();
+    }
 
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info")
     }
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
 
-    if env::var("DATA_DIR").is_err() {
-        let mut dir = dirs::home_dir().unwrap();
-        dir.push(".pfd");
-        env::set_var("DATA_DIR", dir.to_str().unwrap());
-    }
+    //let subscriber = Subscriber::builder()
+    //    .with_env_filter(EnvFilter::from_default_env())
+    //    .finish();
 
-    let data_dir = env::var("DATA_DIR").unwrap();
-    let data_dir = Path::new(&data_dir);
+    let log_file_appender = tracing_appender::rolling::never(data_dir, "pfd.log");
+    let (log_file_appender, _log_file_guard) = tracing_appender::non_blocking(log_file_appender);
 
-    if !data_dir.exists() {
-        warn!(data_dir = ?data_dir.to_str(), "Data dir does not exist, creating");
-        std::fs::create_dir_all(data_dir).unwrap();
-    } else {
-        warn!(data_dir = ?data_dir.to_str(), "Set data dir");
-    }
+    let subscriber = Registry::default()
+        .with(EnvFilter::from_default_env())
+        .with(Layer::new().with_writer(std::io::stdout))
+        .with(Layer::new().with_writer(log_file_appender));
 
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    tracing_log::LogTracer::builder()
+        .with_max_level(tracing_core::LevelFilter::current().as_log())
+        .init()?;
+
+    let args: Vec<String> = env::args().collect();
+    warn!("Starting up");
+    warn!(data_dir = %data_dir.display());
+    warn!(?args);
+    cli(&args[1..]).await;
     Ok(())
 }
 
