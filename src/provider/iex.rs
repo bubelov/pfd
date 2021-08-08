@@ -2,38 +2,47 @@ use crate::{model::ExchangeRate, repository::exchange_rates};
 use chrono::Utc;
 use color_eyre::Report;
 use cron::Schedule;
-use rocket::figment::Figment;
-use rocket::serde::Deserialize;
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
 use rusqlite::Connection;
+use serde::Deserialize;
+use std::env;
+use std::path::Path;
 use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::warn;
 
-pub struct IexCryptoProvider {
-    pub conf: IexCryptoProviderConf,
+pub struct Iex {
+    conf: IexConf,
     conn: Connection,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
-pub struct IexCryptoProviderConf {
-    pub enabled: bool,
-    schedule: String,
+struct IexConf {
+    crypto: bool,
+    crypto_schedule: String,
     token: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
 struct IexCryptoQuote {
     #[serde(rename = "latestPrice")]
     latest_price: String,
 }
 
-impl IexCryptoProvider {
-    pub fn new(conf: &Figment, conn: Connection) -> Result<IexCryptoProvider, Report> {
-        let conf: IexCryptoProviderConf = conf.extract_inner("providers.crypto.iex")?;
+impl Iex {
+    pub fn new(conn: Connection) -> Result<Iex, Report> {
+        let conf_path = env::var("DATA_DIR").unwrap();
+        let conf_path = Path::new(&conf_path).join("pfd.conf");
 
-        Ok(IexCryptoProvider {
+        let conf: IexConf = Figment::new()
+            .merge(Toml::file("pfd.conf"))
+            .merge(Toml::file(conf_path))
+            .extract_inner("providers.iex")?;
+
+        Ok(Iex {
             conf: conf,
             conn: conn,
         })
@@ -41,7 +50,7 @@ impl IexCryptoProvider {
 
     pub async fn schedule(&mut self) {
         warn!(provider = "ecb", "Scheduling sync...");
-        let schedule = Schedule::from_str(&self.conf.schedule).unwrap();
+        let schedule = Schedule::from_str(&self.conf.crypto_schedule).unwrap();
 
         for next_sync in schedule.upcoming(Utc) {
             warn!(provider = "ecb", %next_sync, "Got next sync date");

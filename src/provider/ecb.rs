@@ -2,32 +2,36 @@ use crate::{model::ExchangeRate, repository::exchange_rates};
 use chrono::Utc;
 use color_eyre::Report;
 use cron::Schedule;
-use rocket::figment::Figment;
-use rocket::serde::Deserialize;
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::io::{copy, Cursor};
 use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::warn;
 use zip::ZipArchive;
 
-pub struct EcbFiatProvider {
-    pub conf: EcbFiatProviderConf,
+pub struct Ecb {
+    conf: EcbConf,
     conn: Connection,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(crate = "rocket::serde")]
-pub struct EcbFiatProviderConf {
-    pub enabled: bool,
-    schedule: String,
+struct EcbConf {
+    fiat: bool,
+    fiat_schedule: String,
 }
 
-impl EcbFiatProvider {
-    pub fn new(conf: &Figment, conn: Connection) -> Result<EcbFiatProvider, Report> {
-        let conf: EcbFiatProviderConf = conf.extract_inner("providers.fiat.ecb")?;
+impl Ecb {
+    pub fn new(conn: Connection) -> Result<Ecb, Report> {
+        let conf: EcbConf = Figment::new()
+            .merge(Toml::file("pfd.conf"))
+            .extract_inner("providers.ecb")?;
 
-        Ok(EcbFiatProvider {
+        Ok(Ecb {
             conf: conf,
             conn: conn,
         })
@@ -35,7 +39,7 @@ impl EcbFiatProvider {
 
     pub async fn schedule(&mut self) {
         warn!(provider = "ecb", "Scheduling sync...");
-        let schedule = Schedule::from_str(&self.conf.schedule).unwrap();
+        let schedule = Schedule::from_str(&self.conf.fiat_schedule).unwrap();
 
         for next_sync in schedule.upcoming(Utc) {
             warn!(provider = "ecb", %next_sync, "Got next sync date");

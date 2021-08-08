@@ -1,9 +1,13 @@
-use crate::provider::{EcbFiatProvider, IexCryptoProvider};
+use crate::provider::{Ecb, Iex};
 use color_eyre::Report;
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
 use futures::join;
-use rocket::{figment::Figment, serde::Deserialize};
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::{fs::remove_file, process::exit};
 use tracing::{error, info, warn};
 
@@ -17,7 +21,6 @@ pub enum DbVersion {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(crate = "rocket::serde")]
 pub struct Migration {
     version: i16,
     up: String,
@@ -44,7 +47,7 @@ pub async fn cli(args: &[String], conf: &Figment) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
                 None => DbVersion::Latest,
             };
-            migrate(conf, &mut conn, version).unwrap_or_else(|e| {
+            migrate(&mut conn, version).unwrap_or_else(|e| {
                 error!(%e, "Migration failed");
                 exit(1);
             });
@@ -73,15 +76,13 @@ fn drop(conf: &Figment) -> Result<(), Report> {
     Ok(())
 }
 
-pub fn migrate(
-    conf: &Figment,
-    conn: &mut Connection,
-    target_version: DbVersion,
-) -> Result<(), Report> {
+pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<(), Report> {
     let current_version = schema_version(conn)?;
     info!(?current_version, ?target_version, "Migrating db schema");
 
-    let migrations: Vec<Migration> = conf.extract_inner("migrations")?;
+    let migrations: Vec<Migration> = Figment::new()
+        .merge(Toml::file("pfd.conf"))
+        .extract_inner("migrations")?;
     info!(count = migrations.len(), "Loaded migrations");
 
     let target_version = match target_version {
@@ -134,47 +135,26 @@ pub fn migrate(
 }
 
 async fn sync(args: &[String], conf: &Figment) -> Result<(), Report> {
-    let default_target = "all".to_string();
-    let target = args.get(0).unwrap_or(&default_target);
+    let mut ecb = Ecb::new(connect(&conf)?)?;
+    let mut iex = Iex::new(connect(&conf)?)?;
 
-    let mut ecb_fiat = EcbFiatProvider::new(&conf, connect(&conf)?)?;
-    let mut iex_crypto = IexCryptoProvider::new(&conf, connect(&conf)?)?;
-
-    match target.as_str() {
-        "schedule" => {
-            join!(ecb_fiat.schedule(), iex_crypto.schedule());
-            Ok(())
+    match args.len() {
+        0 => {
+            join!(ecb.schedule(), iex.schedule());
         }
-        "all" => {
-            if ecb_fiat.conf.enabled {
-                ecb_fiat.sync().await?;
+        1 => {
+            if args.get(0).unwrap_or(&"".to_string()) == "now" {
+                ecb.sync().await?;
+                iex.sync().await?;
+            } else {
+                error!(?args, "Invalid arguments");
+                exit(1);
             }
-
-            if iex_crypto.conf.enabled {
-                iex_crypto.sync().await?;
-            }
-
-            Ok(())
         }
-        "fiat" => {
-            if ecb_fiat.conf.enabled {
-                ecb_fiat.sync().await?;
-            }
-
-            Ok(())
-        }
-        "crypto" => {
-            if iex_crypto.conf.enabled {
-                iex_crypto.sync().await?;
-            }
-
-            Ok(())
-        }
-        _ => Err(Report::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Unknown sync target",
-        ))),
+        _ => error!(?args, "Invalid arguments"),
     }
+
+    Ok(())
 }
 
 pub fn connect(conf: &Figment) -> Result<Connection, Report> {

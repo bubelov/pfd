@@ -108,10 +108,9 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
 }
 
 async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
-    let conf = rocket.figment().clone();
     let db = Db::get_one(&rocket).await.unwrap();
     db.run(move |conn| {
-        db::migrate(&conf, conn, DbVersion::Latest).unwrap_or_else(|e| {
+        db::migrate(conn, DbVersion::Latest).unwrap_or_else(|e| {
             error!(%e, "Migration failed");
             exit(1);
         })

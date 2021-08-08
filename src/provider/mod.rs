@@ -1,4 +1,4 @@
-mod ecb_fiat;
-mod iex_crypto;
-pub use ecb_fiat::EcbFiatProvider;
-pub use iex_crypto::IexCryptoProvider;
+mod ecb;
+mod iex;
+pub use ecb::Ecb;
+pub use iex::Iex;
