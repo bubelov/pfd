@@ -2,14 +2,8 @@ use crate::{model::ExchangeRate, repository::exchange_rates};
 use chrono::Utc;
 use color_eyre::Report;
 use cron::Schedule;
-use figment::{
-    providers::{Format, Toml},
-    Figment,
-};
 use rusqlite::Connection;
 use serde::Deserialize;
-use std::env;
-use std::path::Path;
 use std::str::FromStr;
 use tokio::time::sleep;
 use tracing::warn;
@@ -19,33 +13,25 @@ pub struct Iex {
     conn: Connection,
 }
 
-#[derive(Debug, Deserialize)]
-struct IexConf {
-    crypto: bool,
-    crypto_schedule: String,
-    token: String,
+#[derive(Deserialize)]
+pub struct IexConf {
+    pub crypto: bool,
+    pub crypto_schedule: String,
+    pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct IexCryptoQuote {
     #[serde(rename = "latestPrice")]
     latest_price: String,
 }
 
 impl Iex {
-    pub fn new(conn: Connection) -> Result<Iex, Report> {
-        let conf_path = env::var("DATA_DIR").unwrap();
-        let conf_path = Path::new(&conf_path).join("pfd.conf");
-
-        let conf: IexConf = Figment::new()
-            .merge(Toml::file("pfd.conf"))
-            .merge(Toml::file(conf_path))
-            .extract_inner("providers.iex")?;
-
-        Ok(Iex {
+    pub fn new(conf: IexConf, conn: Connection) -> Iex {
+        Iex {
             conf: conf,
             conn: conn,
-        })
+        }
     }
 
     pub async fn schedule(&mut self) {

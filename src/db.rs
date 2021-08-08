@@ -1,4 +1,7 @@
-use crate::provider::{Ecb, Iex};
+use crate::{
+    conf::Conf,
+    provider::{Ecb, Iex},
+};
 use color_eyre::Report;
 use figment::{
     providers::{Format, Toml},
@@ -134,9 +137,10 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<(), R
     Ok(())
 }
 
-async fn sync(args: &[String], conf: &Figment) -> Result<(), Report> {
-    let mut ecb = Ecb::new(connect(&conf)?)?;
-    let mut iex = Iex::new(connect(&conf)?)?;
+async fn sync(args: &[String], rocket_conf: &Figment) -> Result<(), Report> {
+    let conf = Conf::new()?;
+    let mut ecb = Ecb::new(conf.providers.ecb, connect(&rocket_conf)?);
+    let mut iex = Iex::new(conf.providers.iex, connect(&rocket_conf)?);
 
     match args.len() {
         0 => {

@@ -1,4 +1,4 @@
 mod ecb;
 mod iex;
-pub use ecb::Ecb;
-pub use iex::Iex;
+pub use ecb::{Ecb, EcbConf};
+pub use iex::{Iex, IexConf};

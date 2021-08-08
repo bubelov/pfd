@@ -2,10 +2,6 @@ use crate::{model::ExchangeRate, repository::exchange_rates};
 use chrono::Utc;
 use color_eyre::Report;
 use cron::Schedule;
-use figment::{
-    providers::{Format, Toml},
-    Figment,
-};
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::io::{copy, Cursor};
@@ -19,22 +15,18 @@ pub struct Ecb {
     conn: Connection,
 }
 
-#[derive(Debug, Deserialize)]
-struct EcbConf {
-    fiat: bool,
-    fiat_schedule: String,
+#[derive(Deserialize)]
+pub struct EcbConf {
+    pub fiat: bool,
+    pub fiat_schedule: String,
 }
 
 impl Ecb {
-    pub fn new(conn: Connection) -> Result<Ecb, Report> {
-        let conf: EcbConf = Figment::new()
-            .merge(Toml::file("pfd.conf"))
-            .extract_inner("providers.ecb")?;
-
-        Ok(Ecb {
+    pub fn new(conf: EcbConf, conn: Connection) -> Ecb {
+        Ecb {
             conf: conf,
             conn: conn,
-        })
+        }
     }
 
     pub async fn schedule(&mut self) {

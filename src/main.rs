@@ -1,3 +1,4 @@
+mod conf;
 mod controller;
 mod db;
 mod model;
@@ -76,11 +77,6 @@ async fn main() -> Result<(), Report> {
 }
 
 async fn cli(args: &[String]) {
-    let action = args.get(0).unwrap_or_else(|| {
-        error!(?args, "Action is not specified");
-        exit(1);
-    });
-
     let db_url = env::var("DATA_DIR").unwrap();
     let db_url = Path::new(&db_url).join("pfd.db");
 
@@ -89,13 +85,15 @@ async fn cli(args: &[String]) {
         .merge(("cli_colors", false))
         .merge(("log_level", "off"));
 
-    match action.as_str() {
-        "db" => db::cli(&args[1..], &conf).await,
-        "serve" => prepare(rocket::custom(conf)).launch().await.unwrap(),
-        _ => {
-            error!(%action, ?args, "Unknown action");
-            exit(1);
-        }
+    match args.len() {
+        0 => prepare(rocket::custom(conf)).launch().await.unwrap(),
+        _ => match args.get(0).unwrap().as_str() {
+            "db" => db::cli(&args[1..], &conf).await,
+            _ => {
+                error!(?args, "Unknown action");
+                exit(1);
+            }
+        },
     }
 }
 
