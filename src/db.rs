@@ -1,16 +1,12 @@
 use crate::{
-    conf::Conf,
+    conf::{Conf, Migration},
     provider::{Ecb, Iex},
 };
 use color_eyre::Report;
-use figment::{
-    providers::{Format, Toml},
-    Figment,
-};
+use figment::Figment;
 use futures::join;
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
-use serde::Deserialize;
 use std::{fs::remove_file, process::exit};
 use tracing::{error, info, warn};
 
@@ -21,13 +17,6 @@ pub struct Db(Connection);
 pub enum DbVersion {
     Specific(i16),
     Latest,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Migration {
-    version: i16,
-    up: String,
-    down: String,
 }
 
 pub async fn cli(args: &[String], conf: &Figment) {
@@ -83,9 +72,7 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<(), R
     let current_version = schema_version(conn)?;
     info!(?current_version, ?target_version, "Migrating db schema");
 
-    let migrations: Vec<Migration> = Figment::new()
-        .merge(Toml::file("pfd.conf"))
-        .extract_inner("migrations")?;
+    let migrations = Conf::new()?.migrations;
     info!(count = migrations.len(), "Loaded migrations");
 
     let target_version = match target_version {

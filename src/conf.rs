@@ -22,7 +22,7 @@ pub struct ProvidersConf {
     pub iex: IexConf,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Migration {
     pub version: i16,
     pub up: String,
