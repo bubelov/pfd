@@ -1,14 +1,16 @@
 use crate::db::Db;
-use crate::service::users;
+use crate::model::Id;
+use crate::service::{auth_tokens, users};
 use rocket::{
     http::Status,
     outcome::try_outcome,
     request::{FromRequest, Outcome, Request},
 };
-use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct User {
-    pub id: Uuid,
+    pub id: Id,
 }
 
 #[rocket::async_trait]
@@ -26,8 +28,12 @@ impl<'r> FromRequest<'r> for User {
         let auth_header: Vec<_> = auth_headers[0].split(" ").collect();
 
         if auth_header.len() == 2 {
-            let id = Uuid::parse_str(auth_header[1]).unwrap();
-            let user = users::get_by_id(&id, db).await;
+            let token_id = auth_header[1].parse::<Id>().unwrap();
+            let token = auth_tokens::select_by_id(&token_id, &db)
+                .await
+                .unwrap()
+                .unwrap();
+            let user = users::select_by_id(&token.user_id, &db).await;
 
             return match user {
                 Ok(user) => match user {

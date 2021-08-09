@@ -90,7 +90,10 @@ async fn cli(args: &[String]) {
 
 fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket
-        .mount("/", routes![controller::exchange_rates::get])
+        .mount(
+            "/",
+            routes![controller::exchange_rates::get, controller::users::post],
+        )
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
         .register("/", catchers![default_catcher])

@@ -1,7 +1,7 @@
 use crate::{
-    model::{ExchangeRate, User},
+    model::{AuthToken, ExchangeRate, User},
     prepare,
-    repository::{exchange_rates, users},
+    repository::{auth_tokens, exchange_rates, users},
 };
 use rocket::{
     fairing::AdHoc,
@@ -10,11 +10,11 @@ use rocket::{
 };
 use rusqlite::Connection;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 static USER_ID: &str = "9b91bff6-b09c-4d7a-bf63-2aac76793b35";
+static AUTH_TOKEN: &str = "5110afcc-f3cc-420e-bb8c-a4f425af74c8";
 
 fn setup() -> (Client, Connection) {
     let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -23,14 +23,22 @@ fn setup() -> (Client, Connection) {
     let mut conn = Connection::open(&db_url).unwrap();
     let rocket = prepare(rocket::custom(&conf)).attach(AdHoc::on_request("Authorize", |req, _| {
         Box::pin(async move {
-            req.add_header(Header::new("Authorization", format!("Bearer {}", USER_ID)));
+            req.add_header(Header::new(
+                "Authorization",
+                format!("Bearer {}", AUTH_TOKEN),
+            ));
         })
     }));
     let client = Client::untracked(rocket).unwrap();
     let user = User {
-        id: Uuid::parse_str(USER_ID).unwrap(),
+        id: USER_ID.parse().unwrap(),
     };
-    users::insert_or_replace(&mut conn, &user).unwrap();
+    let token = AuthToken {
+        id: AUTH_TOKEN.parse().unwrap(),
+        user_id: user.id.clone(),
+    };
+    users::insert_or_replace(&user, &mut conn).unwrap();
+    auth_tokens::insert_or_replace(&token, &mut conn).unwrap();
     (client, conn)
 }
 
@@ -41,6 +49,15 @@ fn setup_without_auth() -> Client {
     let rocket = prepare(rocket::custom(&conf));
     let client = Client::untracked(rocket).unwrap();
     client
+}
+
+#[test]
+fn users_controller_post() {
+    let client = setup_without_auth();
+    let res = client.post("/users").dispatch();
+    assert_eq!(res.status(), Status::Created);
+    use crate::controller::users::PostPayload;
+    res.into_json::<PostPayload>().unwrap();
 }
 
 #[test]
