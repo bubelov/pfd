@@ -1,6 +1,6 @@
 use crate::{model::ExchangeRate, repository::exchange_rates};
+use anyhow::Result;
 use chrono::Utc;
-use color_eyre::Report;
 use cron::Schedule;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -51,7 +51,7 @@ impl Ecb {
         }
     }
 
-    pub async fn sync(&mut self) -> Result<(), Report> {
+    pub async fn sync(&mut self) -> Result<()> {
         let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
         let res = reqwest::get(url).await?;
         let body = Cursor::new(res.bytes().await?);

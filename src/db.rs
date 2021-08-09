@@ -2,7 +2,7 @@ use crate::{
     conf::{Conf, Migration},
     provider::{Ecb, Iex},
 };
-use color_eyre::Report;
+use anyhow::Result;
 use figment::Figment;
 use futures::join;
 use rocket_sync_db_pools::database;
@@ -55,7 +55,7 @@ pub async fn cli(args: &[String], conf: &Figment) {
     };
 }
 
-fn drop(conf: &Figment) -> Result<(), Report> {
+fn drop(conf: &Figment) -> Result<()> {
     info!("Dropping database...");
     let path = conf.find_value("databases.main.url")?;
     let path = path.as_str().ok_or(std::io::Error::new(
@@ -68,7 +68,7 @@ fn drop(conf: &Figment) -> Result<(), Report> {
     Ok(())
 }
 
-pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<(), Report> {
+pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     let current_version = schema_version(conn)?;
     info!(?current_version, ?target_version, "Migrating db schema");
 
@@ -124,7 +124,7 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<(), R
     Ok(())
 }
 
-async fn sync(args: &[String], rocket_conf: &Figment) -> Result<(), Report> {
+async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     let conf = Conf::new()?;
     let mut ecb = Ecb::new(conf.providers.ecb, connect(&rocket_conf)?);
     let mut iex = Iex::new(conf.providers.iex, connect(&rocket_conf)?);
@@ -148,7 +148,7 @@ async fn sync(args: &[String], rocket_conf: &Figment) -> Result<(), Report> {
     Ok(())
 }
 
-pub fn connect(conf: &Figment) -> Result<Connection, Report> {
+pub fn connect(conf: &Figment) -> Result<Connection> {
     let path = conf.find_value("databases.main.url")?;
     let path = path.as_str().ok_or(std::io::Error::new(
         std::io::ErrorKind::Other,

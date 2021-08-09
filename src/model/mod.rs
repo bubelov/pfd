@@ -1,5 +1,5 @@
-mod error;
-pub use error::Error;
+mod api_error;
+pub use api_error::ApiError;
 mod api_result;
 pub use api_result::ApiResult;
 mod exchange_rate;

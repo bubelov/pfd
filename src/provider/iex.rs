@@ -1,6 +1,6 @@
 use crate::{model::ExchangeRate, repository::exchange_rates};
+use anyhow::Result;
 use chrono::Utc;
-use color_eyre::Report;
 use cron::Schedule;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -56,7 +56,7 @@ impl Iex {
         }
     }
 
-    pub async fn sync(&mut self) -> Result<(), Report> {
+    pub async fn sync(&mut self) -> Result<()> {
         let url = format!(
             "https://cloud.iexapis.com/stable/crypto/BTCEUR/quote?token={}",
             self.conf.token

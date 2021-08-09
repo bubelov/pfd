@@ -8,8 +8,8 @@ mod service;
 #[cfg(test)]
 mod tests;
 
-use crate::model::Error;
-use color_eyre::Report;
+use crate::model::ApiError;
+use anyhow::Result;
 use db::{Db, DbVersion};
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
@@ -24,13 +24,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Registry;
 
 #[rocket::main]
-async fn main() -> Result<(), Report> {
-    if env::var("RUST_LIB_BACKTRACE").is_err() {
-        env::set_var("RUST_LIB_BACKTRACE", "1")
-    }
-
-    color_eyre::install()?;
-
+async fn main() -> Result<()> {
     if env::var("DATA_DIR").is_err() {
         let dir = dirs::home_dir().unwrap().join(".pfd");
         env::set_var("DATA_DIR", dir.to_str().unwrap());
@@ -115,6 +109,6 @@ async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
 }
 
 #[catch(default)]
-fn default_catcher(status: Status, _request: &Request) -> Error {
-    Error::short(status)
+fn default_catcher(status: Status, _request: &Request) -> ApiError {
+    ApiError::short(status)
 }

@@ -1,5 +1,5 @@
 use crate::provider::{EcbConf, IexConf};
-use color_eyre::Report;
+use anyhow::Result;
 use figment::{
     providers::{Format, Toml},
     Figment,
@@ -30,7 +30,7 @@ pub struct Migration {
 }
 
 impl Conf {
-    pub fn new() -> Result<Conf, Report> {
+    pub fn new() -> Result<Conf> {
         let default_conf = include_bytes!("../pfd.conf");
         let default_conf = String::from_utf8_lossy(default_conf);
         let conf = Figment::new().merge(Toml::string(&default_conf));
