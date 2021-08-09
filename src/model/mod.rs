@@ -6,3 +6,5 @@ mod exchange_rate;
 pub use exchange_rate::ExchangeRate;
 mod user;
 pub use user::User;
+mod auth_token;
+pub use auth_token::AuthToken;
