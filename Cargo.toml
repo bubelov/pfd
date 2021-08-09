@@ -36,9 +36,6 @@ features = [ "rustls-tls", "json" ]
 [dependencies.zip]
 version = "0.5"
 
-[dependencies.dotenv]
-version = "0.15.0"
-
 [dependencies.cron]
 version = "0.9.0"
 

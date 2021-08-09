@@ -11,7 +11,6 @@ mod tests;
 use crate::model::Error;
 use color_eyre::Report;
 use db::{Db, DbVersion};
-use dotenv::dotenv;
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
 };
@@ -26,8 +25,6 @@ use tracing_subscriber::Registry;
 
 #[rocket::main]
 async fn main() -> Result<(), Report> {
-    dotenv().ok();
-
     if env::var("RUST_LIB_BACKTRACE").is_err() {
         env::set_var("RUST_LIB_BACKTRACE", "1")
     }
