@@ -5,9 +5,10 @@ use rocket::{
     outcome::try_outcome,
     request::{FromRequest, Outcome, Request},
 };
+use uuid::Uuid;
 
 pub struct User {
-    pub id: String,
+    pub id: Uuid,
 }
 
 #[rocket::async_trait]
@@ -25,8 +26,8 @@ impl<'r> FromRequest<'r> for User {
         let auth_header: Vec<_> = auth_headers[0].split(" ").collect();
 
         if auth_header.len() == 2 {
-            let id = auth_header[1];
-            let user = users::get(id, db).await;
+            let id = Uuid::parse_str(auth_header[1]).unwrap();
+            let user = users::get_by_id(&id, db).await;
 
             return match user {
                 Ok(user) => match user {

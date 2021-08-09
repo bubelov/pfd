@@ -33,15 +33,17 @@ impl Conf {
     pub fn new() -> Result<Conf, Report> {
         let default_conf = include_bytes!("../pfd.conf");
         let default_conf = String::from_utf8_lossy(default_conf);
+        let conf = Figment::new().merge(Toml::string(&default_conf));
 
-        let custom_conf_path = env::var("DATA_DIR").unwrap();
-        let custom_conf_path = Path::new(&custom_conf_path).join("pfd.conf");
+        let conf = match env::var("DATA_DIR") {
+            Ok(data_dir) => {
+                let custom_conf_path = Path::new(&data_dir).join("pfd.conf");
+                conf.merge(Toml::file(custom_conf_path))
+            }
+            Err(_) => conf,
+        };
 
-        let conf: Conf = Figment::new()
-            .merge(Toml::string(&default_conf))
-            .merge(Toml::file(custom_conf_path))
-            .extract()?;
-
+        let conf: Conf = conf.extract()?;
         Ok(conf)
     }
 }

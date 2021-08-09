@@ -10,10 +10,11 @@ use rocket::{
 };
 use rusqlite::Connection;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
-static USER_ID: &str = "test";
+static USER_ID: &str = "9b91bff6-b09c-4d7a-bf63-2aac76793b35";
 
 fn setup() -> (Client, Connection) {
     let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -27,7 +28,7 @@ fn setup() -> (Client, Connection) {
     }));
     let client = Client::untracked(rocket).unwrap();
     let user = User {
-        id: USER_ID.to_string(),
+        id: Uuid::parse_str(USER_ID).unwrap(),
     };
     users::insert_or_replace(&mut conn, &user).unwrap();
     (client, conn)
