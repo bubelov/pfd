@@ -8,7 +8,7 @@ use rusqlite::ToSql;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Id(pub Uuid);
 
 impl ToSql for Id {
@@ -37,5 +37,17 @@ impl std::str::FromStr for Id {
 impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.to_hyphenated().fmt(f)
+    }
+}
+
+impl From<uuid::Uuid> for Id {
+    fn from(uuid: uuid::Uuid) -> Self {
+        Self(uuid)
+    }
+}
+
+impl From<Id> for uuid::Uuid {
+    fn from(id: Id) -> Self {
+        id.0
     }
 }

@@ -10,7 +10,7 @@ mod test;
 
 use crate::model::ApiError;
 use anyhow::Result;
-use db::{Db, DbVersion};
+use db::Db;
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
 };
@@ -102,7 +102,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
 async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
     let db = Db::get_one(&rocket).await.unwrap();
     db.run(move |conn| {
-        db::migrate(conn, DbVersion::Latest).unwrap_or_else(|e| {
+        db::migrate_to_latest(conn).unwrap_or_else(|e| {
             error!(%e, "Migration failed");
             exit(1);
         })

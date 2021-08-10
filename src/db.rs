@@ -68,6 +68,10 @@ fn drop(conf: &Figment) -> Result<()> {
     Ok(())
 }
 
+pub fn migrate_to_latest(conn: &mut Connection) -> Result<()> {
+    migrate(conn, DbVersion::Latest)
+}
+
 pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     let current_version = schema_version(conn)?;
     info!(?current_version, ?target_version, "Migrating db schema");

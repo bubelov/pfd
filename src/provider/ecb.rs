@@ -77,7 +77,7 @@ impl Ecb {
             .collect();
 
         for rate in rates {
-            exchange_rate::insert_or_replace(&mut self.conn, &rate)?;
+            exchange_rate::insert_or_replace(&rate, &mut self.conn)?;
         }
 
         Ok(())

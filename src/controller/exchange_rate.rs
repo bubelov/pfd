@@ -29,7 +29,7 @@ mod test {
             rate: 1.25,
         };
 
-        exchange_rate::insert_or_replace(&mut db, &rate).unwrap();
+        exchange_rate::insert_or_replace(&rate, &mut db).unwrap();
 
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
 
@@ -54,7 +54,7 @@ mod test {
             rate: 1.0 / 1.19,
         };
 
-        exchange_rate::insert_or_replace(&mut db, &rate).unwrap();
+        exchange_rate::insert_or_replace(&rate, &mut db).unwrap();
 
         let res = client.get("/exchange_rates?quote=USD&base=EUR").dispatch();
 
@@ -79,8 +79,8 @@ mod test {
             rate: 0.0115324823898994,
         };
 
-        exchange_rate::insert_or_replace(&mut db, &usd_eur).unwrap();
-        exchange_rate::insert_or_replace(&mut db, &rub_eur).unwrap();
+        exchange_rate::insert_or_replace(&usd_eur, &mut db).unwrap();
+        exchange_rate::insert_or_replace(&rub_eur, &mut db).unwrap();
 
         let rub_usd = ExchangeRate {
             quote: "RUB".to_string(),

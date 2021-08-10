@@ -67,7 +67,7 @@ impl Iex {
             base: "EUR".to_string(),
             rate: quote.latest_price.parse::<f64>()?,
         };
-        exchange_rate::insert_or_replace(&mut self.conn, &rate)?;
+        exchange_rate::insert_or_replace(&rate, &mut self.conn)?;
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use crate::{
+    db::migrate_to_latest,
     model::{AuthToken, User},
     prepare,
     repository::{auth_token, user},
@@ -45,4 +46,12 @@ pub fn setup_without_auth() -> Client {
     let rocket = prepare(rocket::custom(&conf));
     let client = Client::untracked(rocket).unwrap();
     client
+}
+
+pub fn setup_db() -> Connection {
+    let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let db_url = format!("file::testdb_{}:?mode=memory&cache=shared", db_name);
+    let mut conn = Connection::open(&db_url).unwrap();
+    migrate_to_latest(&mut conn).unwrap();
+    conn
 }
