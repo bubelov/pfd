@@ -13,7 +13,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
-static USER_ID: &str = "9b91bff6-b09c-4d7a-bf63-2aac76793b35";
 static AUTH_TOKEN: &str = "5110afcc-f3cc-420e-bb8c-a4f425af74c8";
 
 fn setup() -> (Client, Connection) {
@@ -31,11 +30,12 @@ fn setup() -> (Client, Connection) {
     }));
     let client = Client::untracked(rocket).unwrap();
     let user = User {
-        id: USER_ID.parse().unwrap(),
+        username: "test".to_string(),
+        password_hash: "test".to_string(),
     };
     let token = AuthToken {
         id: AUTH_TOKEN.parse().unwrap(),
-        user_id: user.id.clone(),
+        username: user.username.clone(),
     };
     users::insert_or_replace(&user, &mut conn).unwrap();
     auth_tokens::insert_or_replace(&token, &mut conn).unwrap();
@@ -53,11 +53,15 @@ fn setup_without_auth() -> Client {
 
 #[test]
 fn users_controller_post() {
+    use crate::controller::users::{PostInput, PostOutput};
     let client = setup_without_auth();
-    let res = client.post("/users").dispatch();
+    let input = PostInput {
+        username: "test".to_string(),
+        password: "test".to_string(),
+    };
+    let res = client.post("/users").json(&input).dispatch();
     assert_eq!(res.status(), Status::Created);
-    use crate::controller::users::PostPayload;
-    res.into_json::<PostPayload>().unwrap();
+    res.into_json::<PostOutput>().unwrap();
 }
 
 #[test]

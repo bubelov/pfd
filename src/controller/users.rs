@@ -8,15 +8,22 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
-pub struct PostPayload {
-    user: User,
-    auth_token: AuthToken,
+pub struct PostInput {
+    pub username: String,
+    pub password: String,
 }
 
-#[post("/users")]
-pub async fn post(db: Db) -> ApiResult<PostPayload> {
+#[derive(Serialize, Deserialize)]
+pub struct PostOutput {
+    pub user: User,
+    pub auth_token: AuthToken,
+}
+
+#[post("/users", data = "<input>")]
+pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
     let user = User {
-        id: Id(Uuid::new_v4()),
+        username: input.username.clone(),
+        password_hash: input.password.clone(),
     };
 
     if let Err(e) = users::insert_or_replace(&user, &db).await {
@@ -25,14 +32,14 @@ pub async fn post(db: Db) -> ApiResult<PostPayload> {
 
     let auth_token = AuthToken {
         id: Id(Uuid::new_v4()),
-        user_id: user.id.clone(),
+        username: user.username.clone(),
     };
 
     if let Err(e) = auth_tokens::insert_or_replace(&auth_token, &db).await {
         return ApiResult::internal_error(e);
     }
 
-    ApiResult::Created(Json(PostPayload {
+    ApiResult::Created(Json(PostOutput {
         user: user,
         auth_token: auth_token,
     }))

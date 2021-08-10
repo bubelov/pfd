@@ -1,6 +1,8 @@
-use crate::db::Db;
-use crate::model::Id;
-use crate::service::{auth_tokens, users};
+use crate::{
+    db::Db,
+    model::Id,
+    service::{auth_tokens, users},
+};
 use rocket::{
     http::Status,
     outcome::try_outcome,
@@ -10,7 +12,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
-    pub id: Id,
+    pub username: String,
+    pub password_hash: String,
 }
 
 #[rocket::async_trait]
@@ -33,7 +36,7 @@ impl<'r> FromRequest<'r> for User {
                 .await
                 .unwrap()
                 .unwrap();
-            let user = users::select_by_id(&token.user_id, &db).await;
+            let user = users::select_by_username(&token.username, &db).await;
 
             return match user {
                 Ok(user) => match user {

@@ -1,8 +1,4 @@
-use crate::{
-    db::Db,
-    model::{Id, User},
-    repository::users,
-};
+use crate::{db::Db, model::User, repository::users};
 use anyhow::{Error, Result};
 
 pub async fn insert_or_replace(user: &User, db: &Db) -> Result<()> {
@@ -13,9 +9,9 @@ pub async fn insert_or_replace(user: &User, db: &Db) -> Result<()> {
         .map_err(|e| Error::new(e))
 }
 
-pub async fn select_by_id(id: &Id, db: &Db) -> Result<Option<User>> {
-    let id_owned = id.clone();
-    db.run(move |conn| users::select_by_id(&id_owned, conn))
+pub async fn select_by_username(username: &String, db: &Db) -> Result<Option<User>> {
+    let username = username.clone();
+    db.run(move |conn| users::select_by_username(&username, conn))
         .await
         .map_err(|e| Error::new(e))
 }
