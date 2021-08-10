@@ -1,7 +1,7 @@
 use crate::{
     db::Db,
     model::Id,
-    service::{auth_tokens, users},
+    service::{auth_token, user},
 };
 use rocket::{
     http::Status,
@@ -32,11 +32,11 @@ impl<'r> FromRequest<'r> for User {
 
         if auth_header.len() == 2 {
             let token_id = auth_header[1].parse::<Id>().unwrap();
-            let token = auth_tokens::select_by_id(&token_id, &db)
+            let token = auth_token::select_by_id(&token_id, &db)
                 .await
                 .unwrap()
                 .unwrap();
-            let user = users::select_by_username(&token.username, &db).await;
+            let user = user::select_by_username(&token.username, &db).await;
 
             return match user {
                 Ok(user) => match user {

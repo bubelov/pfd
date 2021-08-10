@@ -1,2 +1,2 @@
-pub mod exchange_rates;
-pub mod users;
+pub mod exchange_rate;
+pub mod user;

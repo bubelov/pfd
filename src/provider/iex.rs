@@ -1,4 +1,4 @@
-use crate::{model::ExchangeRate, repository::exchange_rates};
+use crate::{model::ExchangeRate, repository::exchange_rate};
 use anyhow::Result;
 use chrono::Utc;
 use cron::Schedule;
@@ -67,7 +67,7 @@ impl Iex {
             base: "EUR".to_string(),
             rate: quote.latest_price.parse::<f64>()?,
         };
-        exchange_rates::insert_or_replace(&mut self.conn, &rate)?;
+        exchange_rate::insert_or_replace(&mut self.conn, &rate)?;
         Ok(())
     }
 }

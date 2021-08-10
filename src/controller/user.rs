@@ -1,7 +1,7 @@
 use crate::{
     db::Db,
     model::{ApiResult, AuthToken, Id, User},
-    service::{auth_tokens, users},
+    service::{auth_token, user},
 };
 use rocket::{post, serde::json::Json};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         password_hash: input.password.clone(),
     };
 
-    if let Err(e) = users::insert_or_replace(&user, &db).await {
+    if let Err(e) = user::insert_or_replace(&user, &db).await {
         return ApiResult::internal_error(e);
     }
 
@@ -35,7 +35,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         username: user.username.clone(),
     };
 
-    if let Err(e) = auth_tokens::insert_or_replace(&auth_token, &db).await {
+    if let Err(e) = auth_token::insert_or_replace(&auth_token, &db).await {
         return ApiResult::internal_error(e);
     }
 
@@ -43,4 +43,22 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         user: user,
         auth_token: auth_token,
     }))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::test::setup_without_auth;
+    use rocket::http::Status;
+
+    #[test]
+    fn post() {
+        let client = setup_without_auth();
+        let input = super::PostInput {
+            username: "test".to_string(),
+            password: "test".to_string(),
+        };
+        let res = client.post("/users").json(&input).dispatch();
+        assert_eq!(res.status(), Status::Created);
+        res.into_json::<super::PostOutput>().unwrap();
+    }
 }

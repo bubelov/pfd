@@ -1,3 +1,3 @@
-pub mod auth_tokens;
-pub mod exchange_rates;
-pub mod users;
+pub mod auth_token;
+pub mod exchange_rate;
+pub mod user;

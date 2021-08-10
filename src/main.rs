@@ -6,7 +6,7 @@ mod provider;
 mod repository;
 mod service;
 #[cfg(test)]
-mod tests;
+mod test;
 
 use crate::model::ApiError;
 use anyhow::Result;
@@ -92,7 +92,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket
         .mount(
             "/",
-            routes![controller::exchange_rates::get, controller::users::post],
+            routes![controller::exchange_rate::get, controller::user::post],
         )
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
