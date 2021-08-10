@@ -5,18 +5,17 @@ use crate::{
 };
 use rocket::{post, serde::json::Json};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct PostInput {
-    pub username: String,
-    pub password: String,
+    username: String,
+    password: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct PostOutput {
-    pub user: User,
-    pub auth_token: AuthToken,
+    user: User,
+    auth_token: AuthToken,
 }
 
 #[post("/users", data = "<input>")]
@@ -27,22 +26,22 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
     };
 
     if let Err(e) = user::insert_or_replace(&user, &db).await {
-        return ApiResult::internal_error(e);
+        return (500, e).into();
     }
 
     let auth_token = AuthToken {
-        id: Id(Uuid::new_v4()),
+        id: Id::new(),
         username: user.username.clone(),
     };
 
     if let Err(e) = auth_token::insert_or_replace(&auth_token, &db).await {
-        return ApiResult::internal_error(e);
+        return (500, e).into();
     }
 
-    ApiResult::Created(Json(PostOutput {
+    ApiResult::created(PostOutput {
         user: user,
         auth_token: auth_token,
-    }))
+    })
 }
 
 #[cfg(test)]

@@ -9,8 +9,8 @@ pub async fn insert_or_replace(user: &User, db: &Db) -> Result<()> {
         .map_err(|e| Error::new(e))
 }
 
-pub async fn select_by_username(username: &String, db: &Db) -> Result<Option<User>> {
-    let username = username.clone();
+pub async fn select_by_username(username: &str, db: &Db) -> Result<Option<User>> {
+    let username = username.to_string();
     db.run(move |conn| user::select_by_username(&username, conn))
         .await
         .map_err(|e| Error::new(e))

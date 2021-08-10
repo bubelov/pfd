@@ -19,18 +19,14 @@ pub struct ApiError {
 }
 
 impl ApiError {
-    pub fn short(status: Status) -> ApiError {
+    pub fn new(code: u16, error: Error) -> ApiError {
         ApiError {
-            code: status.code,
-            message: status.reason().unwrap().to_string(),
-            error: None,
-        }
-    }
-
-    pub fn full(status: Status, error: Error) -> ApiError {
-        ApiError {
-            code: status.code,
-            message: status.reason().unwrap().to_string(),
+            code: code,
+            message: Status::from_code(code)
+                .unwrap()
+                .reason()
+                .unwrap_or("")
+                .to_string(),
             error: Some(error),
         }
     }
@@ -53,5 +49,15 @@ impl<'r> Responder<'r, 'static> for ApiError {
             .status(Status::new(self.code))
             .sized_body(body.len(), Cursor::new(body))
             .ok()
+    }
+}
+
+impl From<Status> for ApiError {
+    fn from(s: Status) -> Self {
+        ApiError {
+            code: s.code,
+            message: s.reason().unwrap_or("").to_string(),
+            error: None,
+        }
     }
 }

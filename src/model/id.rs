@@ -11,6 +11,12 @@ use uuid::Uuid;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Id(pub Uuid);
 
+impl Id {
+    pub fn new() -> Id {
+        Uuid::new_v4().into()
+    }
+}
+
 impl ToSql for Id {
     fn to_sql(&self) -> Result<ToSqlOutput<'_>> {
         Ok(ToSqlOutput::Owned(self.to_string().into()))

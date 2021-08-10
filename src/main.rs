@@ -113,5 +113,5 @@ async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
 
 #[catch(default)]
 fn default_catcher(status: Status, _request: &Request) -> ApiError {
-    ApiError::short(status)
+    status.into()
 }

@@ -14,17 +14,51 @@ pub enum ApiResult<T> {
 }
 
 impl<T> ApiResult<T> {
-    pub fn internal_error(e: Error) -> ApiResult<T> {
-        ApiResult::Err(ApiError::full(Status::InternalServerError, e))
+    pub fn ok(t: T) -> ApiResult<T> {
+        ApiResult::Ok(Json(t))
     }
 
-    pub fn new(result: Result<Option<T>>) -> ApiResult<T> {
-        match result {
+    pub fn created(t: T) -> ApiResult<T> {
+        ApiResult::Created(Json(t))
+    }
+}
+
+impl<T> From<ApiError> for ApiResult<T> {
+    fn from(e: ApiError) -> Self {
+        ApiResult::Err(e)
+    }
+}
+
+impl<T> From<Status> for ApiResult<T> {
+    fn from(s: Status) -> Self {
+        ApiResult::Err(ApiError {
+            code: s.code,
+            message: s.reason().unwrap().to_string(),
+            error: None,
+        })
+    }
+}
+
+impl<T> From<(Status, Error)> for ApiResult<T> {
+    fn from(t: (Status, Error)) -> Self {
+        ApiResult::Err(ApiError::new(t.0.code, t.1))
+    }
+}
+
+impl<T> From<(u16, Error)> for ApiResult<T> {
+    fn from(t: (u16, Error)) -> Self {
+        ApiResult::Err(ApiError::new(t.0, t.1))
+    }
+}
+
+impl<T> From<Result<Option<T>>> for ApiResult<T> {
+    fn from(r: Result<Option<T>>) -> Self {
+        match r {
             Ok(opt) => match opt {
-                Some(val) => ApiResult::Ok(Json(val)),
-                None => ApiResult::Err(ApiError::short(Status::NotFound)),
+                Some(val) => ApiResult::ok(val),
+                None => Status::NotFound.into(),
             },
-            Err(e) => ApiResult::Err(ApiError::full(Status::InternalServerError, e)),
+            Err(e) => ApiError::new(500, e).into(),
         }
     }
 }

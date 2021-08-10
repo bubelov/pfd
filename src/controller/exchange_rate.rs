@@ -7,7 +7,9 @@ use rocket::get;
 
 #[get("/exchange_rates?<quote>&<base>")]
 pub async fn get(quote: &str, base: &str, db: Db, _user: User) -> ApiResult<ExchangeRate> {
-    ApiResult::new(exchange_rate::get_by_quote_and_base(quote, base, db).await)
+    exchange_rate::get_by_quote_and_base(quote, base, db)
+        .await
+        .into()
 }
 
 #[cfg(test)]
@@ -17,74 +19,77 @@ mod test {
         repository::exchange_rate,
         test::{setup, setup_without_auth},
     };
+    use anyhow::Result;
     use rocket::http::Status;
 
     #[test]
-    fn get() {
+    fn get() -> Result<()> {
         let (client, mut db) = setup();
 
         let rate = ExchangeRate {
-            quote: "EUR".to_string(),
-            base: "USD".to_string(),
+            quote: "EUR".into(),
+            base: "USD".into(),
             rate: 1.25,
         };
 
-        exchange_rate::insert_or_replace(&rate, &mut db).unwrap();
+        exchange_rate::insert_or_replace(&rate, &mut db)?;
 
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
 
         assert_eq!(res.status(), Status::Ok);
         let body = res.into_json::<ExchangeRate>().unwrap();
         assert_eq!(rate, body);
+        Ok(())
     }
 
     #[test]
-    fn get_inversed() {
+    fn get_inversed() -> Result<()> {
         let (client, mut db) = setup();
 
         let rate = ExchangeRate {
-            quote: "EUR".to_string(),
-            base: "USD".to_string(),
+            quote: "EUR".into(),
+            base: "USD".into(),
             rate: 1.19,
         };
 
         let inversed_rate = ExchangeRate {
-            quote: "USD".to_string(),
-            base: "EUR".to_string(),
+            quote: "USD".into(),
+            base: "EUR".into(),
             rate: 1.0 / 1.19,
         };
 
-        exchange_rate::insert_or_replace(&rate, &mut db).unwrap();
+        exchange_rate::insert_or_replace(&rate, &mut db)?;
 
         let res = client.get("/exchange_rates?quote=USD&base=EUR").dispatch();
 
         assert_eq!(res.status(), Status::Ok);
         let body = res.into_json::<ExchangeRate>().unwrap();
         assert_eq!(inversed_rate, body);
+        Ok(())
     }
 
     #[test]
-    fn get_indirect() {
+    fn get_indirect() -> Result<()> {
         let (client, mut db) = setup();
 
         let usd_eur = ExchangeRate {
-            quote: "USD".to_string(),
-            base: "EUR".to_string(),
+            quote: "USD".into(),
+            base: "EUR".into(),
             rate: 0.840972163821378,
         };
 
         let rub_eur = ExchangeRate {
-            quote: "RUB".to_string(),
-            base: "EUR".to_string(),
+            quote: "RUB".into(),
+            base: "EUR".into(),
             rate: 0.0115324823898994,
         };
 
-        exchange_rate::insert_or_replace(&usd_eur, &mut db).unwrap();
-        exchange_rate::insert_or_replace(&rub_eur, &mut db).unwrap();
+        exchange_rate::insert_or_replace(&usd_eur, &mut db)?;
+        exchange_rate::insert_or_replace(&rub_eur, &mut db)?;
 
         let rub_usd = ExchangeRate {
-            quote: "RUB".to_string(),
-            base: "USD".to_string(),
+            quote: "RUB".into(),
+            base: "USD".into(),
             rate: 0.0115324823898994 / 0.840972163821378,
         };
 
@@ -94,8 +99,8 @@ mod test {
         assert_eq!(rub_usd, body);
 
         let usd_rub = ExchangeRate {
-            quote: "USD".to_string(),
-            base: "RUB".to_string(),
+            quote: "USD".into(),
+            base: "RUB".into(),
             rate: 0.840972163821378 / 0.0115324823898994,
         };
 
@@ -103,6 +108,7 @@ mod test {
         assert_eq!(res.status(), Status::Ok);
         let body = res.into_json::<ExchangeRate>().unwrap();
         assert_eq!(usd_rub, body);
+        Ok(())
     }
 
     #[test]

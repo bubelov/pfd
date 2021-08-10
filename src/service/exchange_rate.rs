@@ -47,8 +47,8 @@ pub async fn get_by_quote_and_base(
 
     if indirect_rate_1.is_some() && indirect_rate_2.is_some() {
         return Ok(Some(ExchangeRate {
-            quote: quote.to_string(),
-            base: base.to_string(),
+            quote: quote.into(),
+            base: base.into(),
             rate: indirect_rate_1.unwrap().rate / indirect_rate_2.unwrap().rate,
         }));
     }
