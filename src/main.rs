@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     let subscriber = Registry::default()
         .with(EnvFilter::from_default_env())
         .with(Layer::new().with_writer(std::io::stdout))
-        .with(Layer::new().with_writer(log_file_appender));
+        .with(Layer::new().with_ansi(false).with_writer(log_file_appender));
 
     tracing::subscriber::set_global_default(subscriber)?;
 
