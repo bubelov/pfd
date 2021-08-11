@@ -3,6 +3,7 @@ use crate::{
     model::{ApiResult, AuthToken, Id, User},
     service::{auth_token, user},
 };
+use rand::RngCore;
 use rocket::{post, serde::json::Json};
 use serde::{Deserialize, Serialize};
 
@@ -46,9 +47,15 @@ impl From<AuthToken> for AuthTokenView {
 
 #[post("/users", data = "<input>")]
 pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
+    let mut salt = [0u8; 128];
+    rand::thread_rng().fill_bytes(&mut salt);
+    let argon2_config = argon2::Config::default();
+    let password_hash =
+        argon2::hash_encoded(input.password.as_bytes(), &salt, &argon2_config).unwrap();
+
     let user = User {
         username: input.username.clone(),
-        password_hash: input.password.clone(),
+        password_hash: password_hash,
     };
 
     if let Err(e) = user::insert_or_replace(&user, &db).await {
@@ -73,17 +80,39 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
 #[cfg(test)]
 mod test {
     use crate::test::setup_without_auth;
+    use anyhow::Result;
     use rocket::http::Status;
 
     #[test]
-    fn post() {
-        let client = setup_without_auth();
+    fn post() -> Result<()> {
+        let (client, _) = setup_without_auth();
         let input = super::PostInput {
-            username: "test".to_string(),
-            password: "test".to_string(),
+            username: "test".into(),
+            password: "test".into(),
         };
         let res = client.post("/users").json(&input).dispatch();
         assert_eq!(res.status(), Status::Created);
         res.into_json::<super::PostOutput>().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn post_password_hashing() -> Result<()> {
+        let (client, mut db) = setup_without_auth();
+        let input = super::PostInput {
+            username: "test".into(),
+            password: "test".into(),
+        };
+        client.post("/users").json(&input).dispatch();
+        use crate::repository::user;
+        let user = user::select_by_username(&input.password, &mut db)?.unwrap();
+        assert_ne!(
+            user.password_hash, input.password,
+            "Password was stored in plaintext!"
+        );
+        let matches =
+            argon2::verify_encoded(&user.password_hash, input.password.as_bytes()).unwrap();
+        assert!(matches);
+        Ok(())
     }
 }

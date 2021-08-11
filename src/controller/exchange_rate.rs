@@ -113,7 +113,7 @@ mod test {
 
     #[test]
     fn get_unauthorized() {
-        let client = setup_without_auth();
+        let (client, _) = setup_without_auth();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::Unauthorized);
     }
