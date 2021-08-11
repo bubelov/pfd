@@ -14,8 +14,34 @@ pub struct PostInput {
 
 #[derive(Serialize, Deserialize)]
 pub struct PostOutput {
-    user: User,
-    auth_token: AuthToken,
+    user: UserView,
+    auth_token: AuthTokenView,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserView {
+    username: String,
+}
+
+impl From<User> for UserView {
+    fn from(user: User) -> UserView {
+        UserView {
+            username: user.username.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AuthTokenView {
+    id: Id,
+}
+
+impl From<AuthToken> for AuthTokenView {
+    fn from(token: AuthToken) -> AuthTokenView {
+        AuthTokenView {
+            id: token.id.clone(),
+        }
+    }
 }
 
 #[post("/users", data = "<input>")]
@@ -39,8 +65,8 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
     }
 
     ApiResult::created(PostOutput {
-        user: user,
-        auth_token: auth_token,
+        user: user.into(),
+        auth_token: auth_token.into(),
     })
 }
 
