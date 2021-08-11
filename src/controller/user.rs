@@ -26,7 +26,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
     };
 
     if let Err(e) = user::insert_or_replace(&user, &db).await {
-        return (500, e).into();
+        return e.into();
     }
 
     let auth_token = AuthToken {
@@ -35,7 +35,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
     };
 
     if let Err(e) = auth_token::insert_or_replace(&auth_token, &db).await {
-        return (500, e).into();
+        return e.into();
     }
 
     ApiResult::created(PostOutput {

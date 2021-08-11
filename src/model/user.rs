@@ -21,32 +21,61 @@ impl<'r> FromRequest<'r> for User {
     type Error = ();
 
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        let auth_headers: Vec<_> = req.headers().get("Authorization").collect();
-        let db: Db = try_outcome!(req.guard::<Db>().await);
+        let headers: Vec<_> = req.headers().get("Authorization").collect();
 
-        if auth_headers.len() != 1 {
+        if headers.len() == 0 {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        let auth_header: Vec<_> = auth_headers[0].split(" ").collect();
-
-        if auth_header.len() == 2 {
-            let token_id = auth_header[1].parse::<Id>().unwrap();
-            let token = auth_token::select_by_id(&token_id, &db)
-                .await
-                .unwrap()
-                .unwrap();
-            let user = user::select_by_username(&token.username, &db).await;
-
-            return match user {
-                Ok(user) => match user {
-                    Some(user) => Outcome::Success(user),
-                    None => Outcome::Failure((Status::BadRequest, ())),
-                },
-                Err(_e) => Outcome::Failure((Status::BadRequest, ())),
-            };
+        if headers.len() > 1 {
+            return Outcome::Failure((Status::BadRequest, ()));
         }
 
-        Outcome::Failure((Status::BadRequest, ()))
+        let header = headers.get(0);
+
+        if let None = header {
+            return Outcome::Failure((Status::Unauthorized, ()));
+        }
+
+        let value_parts: Vec<_> = header.unwrap().split(" ").collect();
+
+        if value_parts.len() != 2 {
+            return Outcome::Failure((Status::BadRequest, ()));
+        }
+
+        let auth_type = value_parts[0];
+        let auth_credentials = value_parts[1];
+
+        if auth_type != "Bearer" {
+            return Outcome::Failure((Status::BadRequest, ()));
+        }
+
+        let db: Db = try_outcome!(req.guard::<Db>().await);
+
+        let token_id = auth_credentials.parse::<Id>();
+
+        if let Err(_) = token_id {
+            return Outcome::Failure((Status::BadRequest, ()));
+        }
+
+        let token = auth_token::select_by_id(&token_id.unwrap(), &db).await;
+
+        if let Err(_) = token {
+            return Outcome::Failure((Status::InternalServerError, ()));
+        }
+
+        let token = token.unwrap();
+
+        if let None = token {
+            return Outcome::Failure((Status::Unauthorized, ()));
+        }
+
+        return match user::select_by_username(&token.unwrap().username, &db).await {
+            Ok(user) => match user {
+                Some(user) => Outcome::Success(user),
+                None => Outcome::Failure((Status::BadRequest, ())),
+            },
+            Err(_e) => Outcome::Failure((Status::BadRequest, ())),
+        };
     }
 }

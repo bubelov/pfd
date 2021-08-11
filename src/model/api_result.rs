@@ -1,7 +1,7 @@
-use super::ApiError;
+use crate::model::ApiError;
 use anyhow::{Error, Result};
-use rocket::serde::Serialize;
 use rocket::{http::Status, response::Responder, serde::json::Json};
+use serde::Serialize;
 
 #[derive(Responder)]
 #[response(bound = "T: Serialize")]
@@ -33,21 +33,15 @@ impl<T> From<Status> for ApiResult<T> {
     fn from(s: Status) -> Self {
         ApiResult::Err(ApiError {
             code: s.code,
-            message: s.reason().unwrap().to_string(),
+            message: s.reason().unwrap_or("").to_string(),
             error: None,
         })
     }
 }
 
-impl<T> From<(Status, Error)> for ApiResult<T> {
-    fn from(t: (Status, Error)) -> Self {
-        ApiResult::Err(ApiError::new(t.0.code, t.1))
-    }
-}
-
-impl<T> From<(u16, Error)> for ApiResult<T> {
-    fn from(t: (u16, Error)) -> Self {
-        ApiResult::Err(ApiError::new(t.0, t.1))
+impl<T> From<Error> for ApiResult<T> {
+    fn from(e: Error) -> Self {
+        ApiResult::Err(ApiError::new(500, e))
     }
 }
 
@@ -58,7 +52,7 @@ impl<T> From<Result<Option<T>>> for ApiResult<T> {
                 Some(val) => ApiResult::ok(val),
                 None => Status::NotFound.into(),
             },
-            Err(e) => ApiError::new(500, e).into(),
+            Err(e) => e.into(),
         }
     }
 }
