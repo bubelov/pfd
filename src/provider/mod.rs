@@ -1,4 +1,6 @@
+mod provider;
+pub use provider::Provider;
 mod ecb;
-mod iex;
 pub use ecb::{Ecb, EcbConf};
+mod iex;
 pub use iex::{Iex, IexConf};

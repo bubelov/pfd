@@ -1,18 +1,16 @@
-use crate::{model::ExchangeRate, repository::exchange_rate};
+use crate::{model::ExchangeRate, provider::Provider, repository::exchange_rate};
 use anyhow::Result;
-use chrono::Utc;
-use cron::Schedule;
 use rusqlite::Connection;
 use serde::Deserialize;
-use std::io::{copy, Cursor};
-use std::str::FromStr;
-use tokio::time::sleep;
-use tracing::warn;
+use std::{
+    io::{copy, Cursor},
+    sync::Mutex,
+};
 use zip::ZipArchive;
 
 pub struct Ecb {
     conf: EcbConf,
-    conn: Connection,
+    conn: Mutex<Connection>,
 }
 
 #[derive(Deserialize)]
@@ -25,33 +23,26 @@ impl Ecb {
     pub fn new(conf: EcbConf, conn: Connection) -> Ecb {
         Ecb {
             conf: conf,
-            conn: conn,
+            conn: Mutex::new(conn),
         }
     }
+}
 
-    pub async fn schedule(&mut self) {
-        warn!(provider = "ecb", "Scheduling sync...");
-        let schedule = Schedule::from_str(&self.conf.fiat_schedule).unwrap();
-
-        for next_sync in schedule.upcoming(Utc) {
-            warn!(provider = "ecb", %next_sync, "Got next sync date");
-            let time_to_next_sync = next_sync.signed_duration_since(Utc::now());
-            if time_to_next_sync.num_nanoseconds().unwrap() < 0 {
-                warn!("Skipping next sync because the old one didn't finish in time");
-                continue;
-            }
-            let time_to_next_sync = time_to_next_sync.to_std().unwrap();
-            warn!(
-                secs_to_next_sync = time_to_next_sync.as_secs(),
-                "Going to sleep till next sync"
-            );
-            sleep(time_to_next_sync).await;
-            warn!("Syncing...");
-            self.sync().await.unwrap();
-        }
+#[rocket::async_trait]
+impl Provider for Ecb {
+    fn name(&self) -> String {
+        "ecb".into()
     }
 
-    pub async fn sync(&mut self) -> Result<()> {
+    fn fiat_sync_enabled(&self) -> bool {
+        self.conf.fiat
+    }
+
+    fn fiat_sync_schedule(&self) -> String {
+        self.conf.fiat_schedule.clone()
+    }
+
+    async fn sync_fiat(&self) -> Result<()> {
         let url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip";
         let res = reqwest::get(url).await?;
         let body = Cursor::new(res.bytes().await?);
@@ -77,9 +68,21 @@ impl Ecb {
             .collect();
 
         for rate in rates {
-            exchange_rate::insert_or_replace(&rate, &mut self.conn)?;
+            exchange_rate::insert_or_replace(&rate, &mut self.conn.lock().unwrap())?;
         }
 
+        Ok(())
+    }
+
+    fn crypto_sync_enabled(&self) -> bool {
+        false
+    }
+
+    fn crypto_sync_schedule(&self) -> String {
+        "".into()
+    }
+
+    async fn sync_crypto(&self) -> Result<()> {
         Ok(())
     }
 }

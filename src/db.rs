@@ -1,10 +1,10 @@
 use crate::{
     conf::{Conf, Migration},
-    provider::{Ecb, Iex},
+    provider::{Ecb, Iex, Provider},
 };
 use anyhow::Result;
 use figment::Figment;
-use futures::join;
+use futures::future::join_all;
 use rocket_sync_db_pools::database;
 use rusqlite::Connection;
 use std::{fs::remove_file, process::exit};
@@ -130,17 +130,24 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
 
 async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     let conf = Conf::new()?;
-    let mut ecb = Ecb::new(conf.providers.ecb, connect(&rocket_conf)?);
-    let mut iex = Iex::new(conf.providers.iex, connect(&rocket_conf)?);
+    let ecb = Ecb::new(conf.providers.ecb, connect(rocket_conf)?);
+    let iex = Iex::new(conf.providers.iex, connect(rocket_conf)?);
 
     match args.len() {
         0 => {
-            join!(ecb.schedule(), iex.schedule());
+            let results = join_all(vec![ecb.schedule(), iex.schedule()]).await;
+
+            for result in results {
+                result?;
+            }
         }
         1 => {
             if args.get(0).unwrap_or(&"".to_string()) == "now" {
-                ecb.sync().await?;
-                iex.sync().await?;
+                let results = join_all(vec![ecb.sync(), iex.sync()]).await;
+
+                for result in results {
+                    result?;
+                }
             } else {
                 error!(?args, "Invalid arguments");
                 exit(1);

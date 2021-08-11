@@ -37,6 +37,10 @@ async fn main() -> Result<()> {
         std::fs::create_dir_all(data_dir).unwrap();
     }
 
+    if env::var("RUST_LIB_BACKTRACE").is_err() {
+        env::set_var("RUST_LIB_BACKTRACE", "1")
+    }
+
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info")
     }
