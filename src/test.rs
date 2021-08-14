@@ -36,7 +36,7 @@ pub fn setup() -> (Client, Connection) {
         id: AUTH_TOKEN.parse().unwrap(),
         username: user.username.clone(),
     };
-    user::insert_or_replace(&user, &mut conn).unwrap();
+    user::insert(&user, &mut conn).unwrap();
     auth_token::insert_or_replace(&token, &mut conn).unwrap();
     (client, conn)
 }

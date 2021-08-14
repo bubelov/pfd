@@ -1,8 +1,8 @@
 use crate::model::User;
 use rusqlite::{params, Connection, OptionalExtension, Result};
 
-pub fn insert_or_replace(row: &User, conn: &mut Connection) -> Result<usize> {
-    let query = "INSERT OR REPLACE INTO user (username, password_hash) VALUES (?, ?)";
+pub fn insert(row: &User, conn: &mut Connection) -> Result<usize> {
+    let query = "INSERT INTO user (username, password_hash) VALUES (?, ?)";
     let params = params![&row.username, &row.password_hash];
     conn.execute(query, params)
 }
@@ -30,7 +30,7 @@ mod test {
     fn insert_or_replace() -> Result<()> {
         let mut conn = setup_db();
         let row = user();
-        assert_eq!(1, super::insert_or_replace(&row, &mut conn)?);
+        assert_eq!(1, super::insert(&row, &mut conn)?);
         Ok(())
     }
 
@@ -40,7 +40,7 @@ mod test {
         let row = user();
         let res = super::select_by_username(&row.username, &mut conn)?;
         assert!(res.is_none());
-        super::insert_or_replace(&row, &mut conn)?;
+        super::insert(&row, &mut conn)?;
         let res = super::select_by_username(&row.username, &mut conn)?;
         assert_eq!(Some(row), res);
         Ok(())

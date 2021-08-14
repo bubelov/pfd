@@ -1,6 +1,6 @@
 use crate::{
     db::Db,
-    model::{ApiResult, AuthToken, Id, User},
+    model::{ApiError, ApiResult, AuthToken, Id, User},
     service::{auth_token, user},
 };
 use rand::RngCore;
@@ -47,6 +47,14 @@ impl From<AuthToken> for AuthTokenView {
 
 #[post("/users", data = "<input>")]
 pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
+    match user::select_by_username(&input.username, &db).await {
+        Ok(opt) => match opt {
+            Some(_) => return ApiError::custom(400, "This username is already taken").into(),
+            None => {}
+        },
+        Err(e) => return e.into(),
+    }
+
     let mut salt = [0u8; 128];
     rand::thread_rng().fill_bytes(&mut salt);
     let argon2_config = argon2::Config::default();
@@ -58,7 +66,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         password_hash: password_hash,
     };
 
-    if let Err(e) = user::insert_or_replace(&user, &db).await {
+    if let Err(e) = user::insert(&user, &db).await {
         return e.into();
     }
 
@@ -96,6 +104,19 @@ mod test {
         let res = client.post("/users").json(&input).dispatch();
         assert_eq!(res.status(), Status::Created);
         res.into_json::<super::PostOutput>().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn post_twice() -> Result<()> {
+        let (client, _) = setup_without_auth();
+        let input = super::PostInput {
+            username: "test".into(),
+            password: "test".into(),
+        };
+        let _res = client.post("/users").json(&input).dispatch();
+        let res = client.post("/users").json(&input).dispatch();
+        assert_eq!(res.status(), Status::BadRequest);
         Ok(())
     }
 

@@ -1,9 +1,9 @@
 use crate::{db::Db, model::User, repository::user};
 use anyhow::{Error, Result};
 
-pub async fn insert_or_replace(user: &User, db: &Db) -> Result<()> {
+pub async fn insert(user: &User, db: &Db) -> Result<()> {
     let user = user.clone();
-    db.run(move |conn| user::insert_or_replace(&user, conn))
+    db.run(move |conn| user::insert(&user, conn))
         .await
         .map(|_| ())
         .map_err(|e| Error::new(e))
