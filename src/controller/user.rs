@@ -71,10 +71,13 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         return e.into();
     }
 
-    ApiResult::created(PostOutput {
-        user: user.into(),
-        auth_token: auth_token.into(),
-    })
+    ApiResult::new(
+        201,
+        PostOutput {
+            user: user.into(),
+            auth_token: auth_token.into(),
+        },
+    )
 }
 
 #[cfg(test)]
