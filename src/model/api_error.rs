@@ -24,6 +24,13 @@ impl ApiError {
                 .to_string(),
         }
     }
+
+    pub fn custom(code: u16, message: &str) -> ApiError {
+        ApiError {
+            code: code,
+            message: message.to_string(),
+        }
+    }
 }
 
 #[async_trait]

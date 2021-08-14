@@ -96,7 +96,11 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket
         .mount(
             "/",
-            routes![controller::exchange_rate::get, controller::user::post],
+            routes![
+                controller::exchange_rate::get,
+                controller::user::post,
+                controller::auth_token::post
+            ],
         )
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))

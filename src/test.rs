@@ -28,7 +28,9 @@ pub fn setup() -> (Client, Connection) {
     let client = Client::untracked(rocket).unwrap();
     let user = User {
         username: "test".to_string(),
-        password_hash: "test".to_string(),
+        password_hash:
+            "$argon2i$v=19$m=4096,t=3,p=1$dGVzdHNhbHQ$vZDbLe7RwrtwcAi3fktiLHdK3/PLogGcGuCgDpoINUc"
+                .to_string(),
     };
     let token = AuthToken {
         id: AUTH_TOKEN.parse().unwrap(),
