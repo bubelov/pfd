@@ -20,7 +20,7 @@ pub fn setup() -> (Client, Connection) {
     let rocket = prepare(rocket::custom(&conf)).attach(AdHoc::on_request("Authorize", |req, _| {
         Box::pin(async move {
             req.add_header(Header::new(
-                "Authorization",
+                "AuthorizatioN",
                 format!("Bearer {}", AUTH_TOKEN),
             ));
         })
