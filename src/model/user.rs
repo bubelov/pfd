@@ -46,7 +46,7 @@ impl<'r> FromRequest<'r> for User {
         let auth_type = value_parts[0];
         let auth_credentials = value_parts[1];
 
-        if auth_type.to_lowercase() != "bearer" {
+        if auth_type != "Bearer" {
             return Outcome::Failure((Status::BadRequest, ()));
         }
 
