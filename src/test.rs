@@ -2,7 +2,7 @@ use crate::{
     db::migrate_to_latest,
     model::{AuthToken, User},
     prepare,
-    repository::{UserRepository, AuthTokenRepository},
+    repository::{AuthTokenRepository, UserRepository},
 };
 use rocket::{fairing::AdHoc, http::Header, local::blocking::Client};
 use rusqlite::Connection;

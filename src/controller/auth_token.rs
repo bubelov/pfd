@@ -1,6 +1,6 @@
 use crate::{
     model::{ApiError, ApiResult, AuthToken, Id, User},
-    repository::{UserRepository, AuthTokenRepository},
+    repository::{AuthTokenRepository, UserRepository},
     service::{auth_token, user},
 };
 use rocket::{post, serde::json::Json, State};

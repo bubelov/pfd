@@ -1,7 +1,7 @@
 use crate::{
     model::{ApiError, ApiResult, AuthToken, Id, User},
+    repository::{AuthTokenRepository, UserRepository},
     service::{auth_token, user},
-    repository::{UserRepository, AuthTokenRepository}
 };
 use rand::RngCore;
 use rocket::{post, serde::json::Json, State};
@@ -46,7 +46,11 @@ impl From<AuthToken> for AuthTokenView {
 }
 
 #[post("/users", data = "<input>")]
-pub async fn post(input: Json<PostInput>, user_repo: &State<UserRepository>, token_repo: &State<AuthTokenRepository>) -> ApiResult<PostOutput> {
+pub async fn post(
+    input: Json<PostInput>,
+    user_repo: &State<UserRepository>,
+    token_repo: &State<AuthTokenRepository>,
+) -> ApiResult<PostOutput> {
     match user::select_by_username(&input.username, user_repo) {
         Ok(opt) => match opt {
             Some(_) => return ApiError::custom(400, "This username is already taken").into(),

@@ -1,7 +1,7 @@
 use crate::{
     model::Id,
-    repository::{UserRepository, AuthTokenRepository},
-    service::{user, auth_token},
+    repository::{AuthTokenRepository, UserRepository},
+    service::{auth_token, user},
 };
 use rocket::{
     http::Status,
