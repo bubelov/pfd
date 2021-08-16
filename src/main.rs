@@ -8,7 +8,10 @@ mod service;
 #[cfg(test)]
 mod test;
 
-use crate::{model::ApiError, repository::UserRepository};
+use crate::{
+    model::ApiError,
+    repository::{AuthTokenRepository, UserRepository},
+};
 use anyhow::Result;
 use db::Db;
 use rocket::{
@@ -95,6 +98,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     warn!(?db_url);
 
     let user_repo = UserRepository::new(Connection::open(db_url).unwrap());
+    let auth_token_repo = AuthTokenRepository::new(Connection::open(db_url).unwrap());
 
     rocket
         .mount(
@@ -108,6 +112,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
         .manage(user_repo)
+        .manage(auth_token_repo)
         .register("/", catchers![default_catcher])
 }
 

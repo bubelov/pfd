@@ -1,7 +1,6 @@
 use crate::{
-    db::Db,
     model::{ApiError, ApiResult, AuthToken, Id, User},
-    repository::UserRepository,
+    repository::{UserRepository, AuthTokenRepository},
     service::{auth_token, user},
 };
 use rocket::{post, serde::json::Json, State};
@@ -48,7 +47,7 @@ impl From<AuthToken> for AuthTokenView {
 #[post("/auth_tokens", data = "<input>")]
 pub async fn post(
     input: Json<PostInput>,
-    db: Db,
+    auth_token_repo: &State<AuthTokenRepository>,
     user_repo: &State<UserRepository>,
 ) -> ApiResult<PostOutput> {
     let user = user::select_by_username(&input.username, user_repo);
@@ -77,7 +76,7 @@ pub async fn post(
         username: user.username.clone(),
     };
 
-    if let Err(e) = auth_token::insert_or_replace(&auth_token, &db).await {
+    if let Err(e) = auth_token::insert(&auth_token, auth_token_repo) {
         return e.into();
     }
 

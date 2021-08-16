@@ -1,8 +1,7 @@
 use crate::{
-    db::Db,
     model::Id,
-    repository::UserRepository,
-    service::{auth_token, user},
+    repository::{UserRepository, AuthTokenRepository},
+    service::{user, auth_token},
 };
 use rocket::{
     http::Status,
@@ -51,8 +50,8 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::BadRequest, ()));
         }
 
-        let db: Db = try_outcome!(req.guard::<Db>().await);
         let user_repo = try_outcome!(req.guard::<&rocket::State<UserRepository>>().await);
+        let token_repo = try_outcome!(req.guard::<&rocket::State<AuthTokenRepository>>().await);
 
         let token_id = auth_credentials.parse::<Id>();
 
@@ -60,7 +59,7 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::BadRequest, ()));
         }
 
-        let token = auth_token::select_by_id(&token_id.unwrap(), &db).await;
+        let token = auth_token::select_by_id(&token_id.unwrap(), token_repo);
 
         if let Err(_) = token {
             return Outcome::Failure((Status::InternalServerError, ()));

@@ -2,7 +2,7 @@ use crate::{
     db::migrate_to_latest,
     model::{AuthToken, User},
     prepare,
-    repository::{auth_token, UserRepository},
+    repository::{UserRepository, AuthTokenRepository},
 };
 use rocket::{fairing::AdHoc, http::Header, local::blocking::Client};
 use rusqlite::Connection;
@@ -16,7 +16,7 @@ pub fn setup() -> (Client, Connection) {
     let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
     let db_url = format!("file::testdb_{}:?mode=memory&cache=shared", db_name);
     let conf = rocket::Config::figment().merge(("databases.main.url", &db_url));
-    let mut conn = Connection::open(&db_url).unwrap();
+    let conn = Connection::open(&db_url).unwrap();
     let rocket = prepare(rocket::custom(&conf)).attach(AdHoc::on_request("Authorize", |req, _| {
         Box::pin(async move {
             req.add_header(Header::new(
@@ -38,7 +38,8 @@ pub fn setup() -> (Client, Connection) {
     };
     let user_repo = UserRepository::new(Connection::open(&db_url).unwrap());
     user_repo.insert(&user).unwrap();
-    auth_token::insert_or_replace(&token, &mut conn).unwrap();
+    let token_repo = AuthTokenRepository::new(Connection::open(&db_url).unwrap());
+    token_repo.insert(&token).unwrap();
     (client, conn)
 }
 
