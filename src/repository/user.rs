@@ -1,47 +1,71 @@
 use crate::model::User;
-use rusqlite::{params, Connection, OptionalExtension, Result};
+use anyhow::{Error, Result};
+use rusqlite::{params, Connection, OptionalExtension};
+use std::sync::Mutex;
 
-pub fn insert(row: &User, conn: &mut Connection) -> Result<usize> {
-    let query = "INSERT INTO user (username, password_hash) VALUES (?, ?)";
-    let params = params![&row.username, &row.password_hash];
-    conn.execute(query, params)
+pub struct UserRepository {
+    conn: Mutex<Connection>,
 }
 
-pub fn select_by_username(username: &str, conn: &mut Connection) -> Result<Option<User>> {
-    conn.query_row(
-        "SELECT password_hash FROM user WHERE username = ?",
-        params![username],
-        |row| {
-            Ok(User {
-                username: username.into(),
-                password_hash: row.get(0)?,
-            })
-        },
-    )
-    .optional()
+impl UserRepository {
+    pub fn new(conn: Connection) -> UserRepository {
+        UserRepository {
+            conn: Mutex::new(conn),
+        }
+    }
+
+    pub fn insert(&self, row: &User) -> Result<()> {
+        let row = row.clone();
+        let query = "INSERT INTO user (username, password_hash) VALUES (?, ?)";
+        let params = params![&row.username, &row.password_hash];
+        self.conn
+            .lock()
+            .unwrap()
+            .execute(query, params)
+            .map(|_| ())
+            .map_err(|e| Error::new(e))
+    }
+
+    pub fn select_by_username(&self, username: &str) -> anyhow::Result<Option<User>> {
+        let username = username.to_string();
+        self.conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT password_hash FROM user WHERE username = ?",
+                params![username],
+                |row| {
+                    Ok(User {
+                        username: username.clone(),
+                        password_hash: row.get(0)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| Error::new(e))
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{model::User, test::setup_db};
-    use rusqlite::Result;
+    use crate::{model::User, repository::UserRepository, test::setup_db};
+    use anyhow::Result;
 
     #[test]
-    fn insert_or_replace() -> Result<()> {
-        let mut conn = setup_db();
-        let row = user();
-        assert_eq!(1, super::insert(&row, &mut conn)?);
+    fn insert() -> Result<()> {
+        let repo = UserRepository::new(setup_db());
+        repo.insert(&user())?;
         Ok(())
     }
 
     #[test]
     fn select_by_username() -> Result<()> {
-        let mut conn = setup_db();
+        let repo = UserRepository::new(setup_db());
         let row = user();
-        let res = super::select_by_username(&row.username, &mut conn)?;
+        let res = repo.select_by_username(&row.username)?;
         assert!(res.is_none());
-        super::insert(&row, &mut conn)?;
-        let res = super::select_by_username(&row.username, &mut conn)?;
+        repo.insert(&row)?;
+        let res = repo.select_by_username(&row.username)?;
         assert_eq!(Some(row), res);
         Ok(())
     }

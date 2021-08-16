@@ -1,9 +1,10 @@
 use crate::{
     db::Db,
     model::{ApiError, ApiResult, AuthToken, Id, User},
+    repository::UserRepository,
     service::{auth_token, user},
 };
-use rocket::{post, serde::json::Json};
+use rocket::{post, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -45,8 +46,12 @@ impl From<AuthToken> for AuthTokenView {
 }
 
 #[post("/auth_tokens", data = "<input>")]
-pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
-    let user = user::select_by_username(&input.username, &db).await;
+pub async fn post(
+    input: Json<PostInput>,
+    db: Db,
+    user_repo: &State<UserRepository>,
+) -> ApiResult<PostOutput> {
+    let user = user::select_by_username(&input.username, user_repo);
 
     if let Err(e) = user {
         return e.into();

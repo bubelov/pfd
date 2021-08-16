@@ -8,20 +8,17 @@ mod service;
 #[cfg(test)]
 mod test;
 
-use crate::model::ApiError;
+use crate::{model::ApiError, repository::UserRepository};
 use anyhow::Result;
 use db::Db;
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
 };
-use std::path::Path;
-use std::{env, process::exit};
+use rusqlite::Connection;
+use std::{env, path::Path, process::exit};
 use tracing::{error, warn};
 use tracing_log::AsLog;
-use tracing_subscriber::fmt::Layer;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{fmt::Layer, layer::SubscriberExt, EnvFilter, Registry};
 
 #[rocket::main]
 async fn main() -> Result<()> {
@@ -93,6 +90,12 @@ async fn cli(args: &[String]) {
 }
 
 fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
+    let db_url = rocket.figment().find_value("databases.main.url").unwrap();
+    let db_url = db_url.as_str().unwrap();
+    warn!(?db_url);
+
+    let user_repo = UserRepository::new(Connection::open(db_url).unwrap());
+
     rocket
         .mount(
             "/",
@@ -104,6 +107,7 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
         )
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
+        .manage(user_repo)
         .register("/", catchers![default_catcher])
 }
 

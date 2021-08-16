@@ -1,6 +1,7 @@
 use crate::{
     db::Db,
     model::Id,
+    repository::UserRepository,
     service::{auth_token, user},
 };
 use rocket::{
@@ -51,6 +52,7 @@ impl<'r> FromRequest<'r> for User {
         }
 
         let db: Db = try_outcome!(req.guard::<Db>().await);
+        let user_repo = try_outcome!(req.guard::<&rocket::State<UserRepository>>().await);
 
         let token_id = auth_credentials.parse::<Id>();
 
@@ -70,7 +72,7 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        return match user::select_by_username(&token.unwrap().username, &db).await {
+        return match user::select_by_username(&token.unwrap().username, user_repo) {
             Ok(user) => match user {
                 Some(user) => Outcome::Success(user),
                 None => Outcome::Failure((Status::BadRequest, ())),

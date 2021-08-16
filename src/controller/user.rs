@@ -1,10 +1,11 @@
 use crate::{
     db::Db,
     model::{ApiError, ApiResult, AuthToken, Id, User},
+    repository::UserRepository,
     service::{auth_token, user},
 };
 use rand::RngCore;
-use rocket::{post, serde::json::Json};
+use rocket::{post, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -46,8 +47,12 @@ impl From<AuthToken> for AuthTokenView {
 }
 
 #[post("/users", data = "<input>")]
-pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
-    match user::select_by_username(&input.username, &db).await {
+pub async fn post(
+    input: Json<PostInput>,
+    db: Db,
+    repo: &State<UserRepository>,
+) -> ApiResult<PostOutput> {
+    match user::select_by_username(&input.username, repo) {
         Ok(opt) => match opt {
             Some(_) => return ApiError::custom(400, "This username is already taken").into(),
             None => {}
@@ -66,7 +71,7 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
         password_hash: password_hash,
     };
 
-    if let Err(e) = user::insert(&user, &db).await {
+    if let Err(e) = user::insert(&user, repo) {
         return e.into();
     }
 
@@ -90,9 +95,10 @@ pub async fn post(input: Json<PostInput>, db: Db) -> ApiResult<PostOutput> {
 
 #[cfg(test)]
 mod test {
-    use crate::test::setup_without_auth;
+    use crate::{repository::UserRepository, test::setup_without_auth};
     use anyhow::Result;
     use rocket::http::Status;
+    use rusqlite::Connection;
 
     #[test]
     fn post() -> Result<()> {
@@ -122,14 +128,21 @@ mod test {
 
     #[test]
     fn post_password_hashing() -> Result<()> {
-        let (client, mut db) = setup_without_auth();
+        let (client, _) = setup_without_auth();
         let input = super::PostInput {
             username: "test".into(),
             password: "test".into(),
         };
         client.post("/users").json(&input).dispatch();
-        use crate::repository::user;
-        let user = user::select_by_username(&input.password, &mut db)?.unwrap();
+        let db_url = client
+            .rocket()
+            .figment()
+            .find_value("databases.main.url")
+            .unwrap();
+        let db_url = db_url.as_str().unwrap();
+        let user = UserRepository::new(Connection::open(db_url).unwrap())
+            .select_by_username(&input.password)?
+            .unwrap();
         assert_ne!(
             user.password_hash, input.password,
             "Password was stored in plaintext!"

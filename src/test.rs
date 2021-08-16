@@ -2,7 +2,7 @@ use crate::{
     db::migrate_to_latest,
     model::{AuthToken, User},
     prepare,
-    repository::{auth_token, user},
+    repository::{auth_token, UserRepository},
 };
 use rocket::{fairing::AdHoc, http::Header, local::blocking::Client};
 use rusqlite::Connection;
@@ -36,7 +36,8 @@ pub fn setup() -> (Client, Connection) {
         id: AUTH_TOKEN.parse().unwrap(),
         username: user.username.clone(),
     };
-    user::insert(&user, &mut conn).unwrap();
+    let user_repo = UserRepository::new(Connection::open(&db_url).unwrap());
+    user_repo.insert(&user).unwrap();
     auth_token::insert_or_replace(&token, &mut conn).unwrap();
     (client, conn)
 }

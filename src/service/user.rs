@@ -1,17 +1,10 @@
-use crate::{db::Db, model::User, repository::user};
-use anyhow::{Error, Result};
+use crate::{model::User, repository::UserRepository};
+use anyhow::Result;
 
-pub async fn insert(user: &User, db: &Db) -> Result<()> {
-    let user = user.clone();
-    db.run(move |conn| user::insert(&user, conn))
-        .await
-        .map(|_| ())
-        .map_err(|e| Error::new(e))
+pub fn insert(user: &User, repo: &UserRepository) -> Result<()> {
+    repo.insert(&user)
 }
 
-pub async fn select_by_username(username: &str, db: &Db) -> Result<Option<User>> {
-    let username = username.to_string();
-    db.run(move |conn| user::select_by_username(&username, conn))
-        .await
-        .map_err(|e| Error::new(e))
+pub fn select_by_username(username: &str, repo: &UserRepository) -> Result<Option<User>> {
+    repo.select_by_username(&username)
 }
