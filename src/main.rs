@@ -20,11 +20,19 @@ use rocket::{
 use rusqlite::Connection;
 use std::{env, path::Path, process::exit};
 use tracing::{error, warn};
-use tracing_log::AsLog;
-use tracing_subscriber::{fmt::Layer, layer::SubscriberExt, EnvFilter, Registry};
 
 #[rocket::main]
 async fn main() -> Result<()> {
+    if env::var("RUST_BACKTRACE").is_err() {
+        env::set_var("RUST_BACKTRACE", "1");
+    }
+
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info")
+    }
+
+    tracing_subscriber::fmt::init();
+
     if env::var("DATA_DIR").is_err() {
         let dir = dirs::home_dir().unwrap().join(".pfd");
         env::set_var("DATA_DIR", dir.to_str().unwrap());
@@ -36,32 +44,6 @@ async fn main() -> Result<()> {
     if !data_dir.exists() {
         std::fs::create_dir_all(data_dir).unwrap();
     }
-
-    if env::var("RUST_LIB_BACKTRACE").is_err() {
-        env::set_var("RUST_LIB_BACKTRACE", "1")
-    }
-
-    if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info")
-    }
-
-    //let subscriber = Subscriber::builder()
-    //    .with_env_filter(EnvFilter::from_default_env())
-    //    .finish();
-
-    let log_file_appender = tracing_appender::rolling::never(data_dir, "pfd.log");
-    let (log_file_appender, _log_file_guard) = tracing_appender::non_blocking(log_file_appender);
-
-    let subscriber = Registry::default()
-        .with(EnvFilter::from_default_env())
-        .with(Layer::new().with_writer(std::io::stdout))
-        .with(Layer::new().with_ansi(false).with_writer(log_file_appender));
-
-    tracing::subscriber::set_global_default(subscriber)?;
-
-    tracing_log::LogTracer::builder()
-        .with_max_level(tracing_core::LevelFilter::current().as_log())
-        .init()?;
 
     let args: Vec<String> = env::args().collect();
     warn!("Starting up");
