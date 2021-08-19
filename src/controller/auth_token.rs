@@ -91,20 +91,23 @@ pub async fn post(
 
 #[cfg(test)]
 mod test {
-    use crate::test::setup;
+    use crate::{
+        controller::auth_token::{PostInput, PostOutput},
+        test::client,
+    };
     use anyhow::Result;
     use rocket::http::Status;
 
     #[test]
     fn post() -> Result<()> {
-        let (client, _) = setup();
-        let input = super::PostInput {
+        let client = client();
+        let input = PostInput {
             username: "test".into(),
             password: "test".into(),
         };
         let res = client.post("/auth_tokens").json(&input).dispatch();
         assert_eq!(res.status(), Status::Created);
-        res.into_json::<super::PostOutput>().unwrap();
+        res.into_json::<PostOutput>().unwrap();
         Ok(())
     }
 }

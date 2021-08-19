@@ -94,30 +94,34 @@ pub async fn post(
 
 #[cfg(test)]
 mod test {
-    use crate::{repository::UserRepository, test::setup_without_auth};
+    use crate::{
+        controller::user::{PostInput, PostOutput},
+        repository::UserRepository,
+        test::client,
+    };
     use anyhow::Result;
     use rocket::http::Status;
     use rusqlite::Connection;
 
     #[test]
     fn post() -> Result<()> {
-        let (client, _) = setup_without_auth();
-        let input = super::PostInput {
-            username: "test".into(),
-            password: "test".into(),
+        let client = client();
+        let input = PostInput {
+            username: "test2".into(),
+            password: "test2".into(),
         };
         let res = client.post("/users").json(&input).dispatch();
         assert_eq!(res.status(), Status::Created);
-        res.into_json::<super::PostOutput>().unwrap();
+        res.into_json::<PostOutput>().unwrap();
         Ok(())
     }
 
     #[test]
     fn post_twice() -> Result<()> {
-        let (client, _) = setup_without_auth();
-        let input = super::PostInput {
-            username: "test".into(),
-            password: "test".into(),
+        let client = client();
+        let input = PostInput {
+            username: "test2".into(),
+            password: "test2".into(),
         };
         let _res = client.post("/users").json(&input).dispatch();
         let res = client.post("/users").json(&input).dispatch();
@@ -127,10 +131,10 @@ mod test {
 
     #[test]
     fn post_password_hashing() -> Result<()> {
-        let (client, _) = setup_without_auth();
-        let input = super::PostInput {
-            username: "test".into(),
-            password: "test".into(),
+        let client = client();
+        let input = PostInput {
+            username: "test2".into(),
+            password: "test2".into(),
         };
         client.post("/users").json(&input).dispatch();
         let db_url = client

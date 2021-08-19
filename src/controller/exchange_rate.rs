@@ -17,17 +17,14 @@ pub async fn get(
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        model::ExchangeRate,
-        test::{setup, setup_without_auth},
-        ExchangeRateRepository,
-    };
+    use crate::{model::ExchangeRate, test::client, ExchangeRateRepository};
     use anyhow::Result;
     use rocket::http::Status;
+    use rusqlite::Connection;
 
     #[test]
     fn get() -> Result<()> {
-        let (client, _) = setup();
+        let client = client();
         let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let rate = ExchangeRate {
@@ -48,7 +45,7 @@ mod test {
 
     #[test]
     fn get_inversed() -> Result<()> {
-        let (client, _) = setup();
+        let client = client();
         let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let rate = ExchangeRate {
@@ -75,7 +72,7 @@ mod test {
 
     #[test]
     fn get_indirect() -> Result<()> {
-        let (client, _) = setup();
+        let client = client();
         let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let usd_eur = ExchangeRate {
@@ -119,22 +116,37 @@ mod test {
 
     #[test]
     fn get_unauthorized() {
-        let (client, _) = setup_without_auth();
+        let client = client();
+        let db_url = client
+            .rocket()
+            .figment()
+            .find_value("databases.main.url")
+            .unwrap();
+        let db_url = db_url.as_str().unwrap();
+        let conn = Connection::open(&db_url).unwrap();
+        conn.execute_batch("DELETE FROM auth_token").unwrap();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::Unauthorized);
     }
 
     #[test]
     fn get_not_found() {
-        let (client, _) = setup();
+        let client = client();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::NotFound);
     }
 
     #[test]
     fn get_sql_query_failed() {
-        let (client, db) = setup();
-        db.execute_batch("DROP TABLE exchange_rate").unwrap();
+        let client = client();
+        let db_url = client
+            .rocket()
+            .figment()
+            .find_value("databases.main.url")
+            .unwrap();
+        let db_url = db_url.as_str().unwrap();
+        let conn = Connection::open(&db_url).unwrap();
+        conn.execute_batch("DROP TABLE exchange_rate").unwrap();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::InternalServerError);
     }

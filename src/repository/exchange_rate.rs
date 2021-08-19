@@ -51,19 +51,20 @@ impl ExchangeRateRepository {
 
 #[cfg(test)]
 mod test {
-    use crate::{model::ExchangeRate, repository::ExchangeRateRepository, test::setup_db};
+    use crate::{model::ExchangeRate, repository::ExchangeRateRepository, test::db};
+    use anyhow::Result;
 
     #[test]
-    fn insert_or_replace() -> anyhow::Result<()> {
-        let repo = ExchangeRateRepository::new(setup_db());
-        repo.insert_or_replace(&exchange_rate())?;
+    fn insert_or_replace() -> Result<()> {
+        let repo = ExchangeRateRepository::new(db());
+        repo.insert_or_replace(&rate())?;
         Ok(())
     }
 
     #[test]
-    fn select_by_quote_and_base() -> anyhow::Result<()> {
-        let repo = ExchangeRateRepository::new(setup_db());
-        let row = exchange_rate();
+    fn select_by_quote_and_base() -> Result<()> {
+        let repo = ExchangeRateRepository::new(db());
+        let row = rate();
         let res = repo.select_by_quote_and_base(&row.quote, &row.base)?;
         assert!(res.is_none());
         repo.insert_or_replace(&row)?;
@@ -72,7 +73,7 @@ mod test {
         Ok(())
     }
 
-    fn exchange_rate() -> ExchangeRate {
+    fn rate() -> ExchangeRate {
         ExchangeRate {
             quote: "TST".into(),
             base: "TST".into(),

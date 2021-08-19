@@ -46,21 +46,21 @@ impl AuthTokenRepository {
 
 #[cfg(test)]
 mod test {
-    use crate::{model::AuthToken, repository::AuthTokenRepository, test::setup_db};
+    use crate::{model::AuthToken, repository::AuthTokenRepository, test::db};
     use anyhow::Result;
     use uuid::Uuid;
 
     #[test]
     fn insert() -> Result<()> {
-        let repo = AuthTokenRepository::new(setup_db());
-        repo.insert(&auth_token())?;
+        let repo = AuthTokenRepository::new(db());
+        repo.insert(&token())?;
         Ok(())
     }
 
     #[test]
     fn select_by_id() -> Result<()> {
-        let repo = AuthTokenRepository::new(setup_db());
-        let row = auth_token();
+        let repo = AuthTokenRepository::new(db());
+        let row = token();
         let res = repo.select_by_id(&row.id)?;
         assert!(res.is_none());
         repo.insert(&row)?;
@@ -69,7 +69,7 @@ mod test {
         Ok(())
     }
 
-    fn auth_token() -> AuthToken {
+    fn token() -> AuthToken {
         AuthToken {
             id: Uuid::new_v4().into(),
             username: "test".into(),

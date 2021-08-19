@@ -48,19 +48,19 @@ impl UserRepository {
 
 #[cfg(test)]
 mod test {
-    use crate::{model::User, repository::UserRepository, test::setup_db};
+    use crate::{model::User, repository::UserRepository, test::db};
     use anyhow::Result;
 
     #[test]
     fn insert() -> Result<()> {
-        let repo = UserRepository::new(setup_db());
+        let repo = UserRepository::new(db());
         repo.insert(&user())?;
         Ok(())
     }
 
     #[test]
     fn select_by_username() -> Result<()> {
-        let repo = UserRepository::new(setup_db());
+        let repo = UserRepository::new(db());
         let row = user();
         let res = repo.select_by_username(&row.username)?;
         assert!(res.is_none());
