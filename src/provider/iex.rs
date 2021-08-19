@@ -1,12 +1,10 @@
-use crate::{model::ExchangeRate, provider::Provider, repository::exchange_rate};
+use crate::{model::ExchangeRate, provider::Provider, repository::ExchangeRateRepository};
 use anyhow::Result;
-use rusqlite::Connection;
 use serde::Deserialize;
-use std::sync::Mutex;
 
 pub struct Iex {
     conf: IexConf,
-    conn: Mutex<Connection>,
+    repo: ExchangeRateRepository,
 }
 
 #[derive(Deserialize)]
@@ -23,10 +21,10 @@ struct IexCryptoQuote {
 }
 
 impl Iex {
-    pub fn new(conf: IexConf, conn: Connection) -> Iex {
+    pub fn new(conf: IexConf, repo: ExchangeRateRepository) -> Iex {
         Iex {
             conf: conf,
-            conn: Mutex::new(conn),
+            repo: repo,
         }
     }
 }
@@ -68,7 +66,7 @@ impl Provider for Iex {
             base: "EUR".into(),
             rate: quote.latest_price.parse::<f64>()?,
         };
-        exchange_rate::insert_or_replace(&rate, &mut self.conn.lock().unwrap())?;
+        self.repo.insert_or_replace(&rate)?;
         Ok(())
     }
 }

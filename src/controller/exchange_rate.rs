@@ -1,30 +1,34 @@
 use crate::{
-    db::Db,
     model::{ApiResult, ExchangeRate, User},
+    repository::ExchangeRateRepository,
     service::exchange_rate,
 };
-use rocket::get;
+use rocket::{get, State};
 
 #[get("/exchange_rates?<quote>&<base>")]
-pub async fn get(quote: &str, base: &str, db: Db, _user: User) -> ApiResult<ExchangeRate> {
-    exchange_rate::get_by_quote_and_base(quote, base, db)
-        .await
-        .into()
+pub async fn get(
+    quote: &str,
+    base: &str,
+    repo: &State<ExchangeRateRepository>,
+    _user: User,
+) -> ApiResult<ExchangeRate> {
+    exchange_rate::get_by_quote_and_base(quote, base, repo).into()
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
         model::ExchangeRate,
-        repository::exchange_rate,
         test::{setup, setup_without_auth},
+        ExchangeRateRepository,
     };
     use anyhow::Result;
     use rocket::http::Status;
 
     #[test]
     fn get() -> Result<()> {
-        let (client, mut db) = setup();
+        let (client, _) = setup();
+        let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let rate = ExchangeRate {
             quote: "EUR".into(),
@@ -32,7 +36,7 @@ mod test {
             rate: 1.25,
         };
 
-        exchange_rate::insert_or_replace(&rate, &mut db)?;
+        repo.insert_or_replace(&rate)?;
 
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
 
@@ -44,7 +48,8 @@ mod test {
 
     #[test]
     fn get_inversed() -> Result<()> {
-        let (client, mut db) = setup();
+        let (client, _) = setup();
+        let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let rate = ExchangeRate {
             quote: "EUR".into(),
@@ -58,7 +63,7 @@ mod test {
             rate: 1.0 / 1.19,
         };
 
-        exchange_rate::insert_or_replace(&rate, &mut db)?;
+        repo.insert_or_replace(&rate)?;
 
         let res = client.get("/exchange_rates?quote=USD&base=EUR").dispatch();
 
@@ -70,7 +75,8 @@ mod test {
 
     #[test]
     fn get_indirect() -> Result<()> {
-        let (client, mut db) = setup();
+        let (client, _) = setup();
+        let repo = client.rocket().state::<ExchangeRateRepository>().unwrap();
 
         let usd_eur = ExchangeRate {
             quote: "USD".into(),
@@ -84,8 +90,8 @@ mod test {
             rate: 0.0115324823898994,
         };
 
-        exchange_rate::insert_or_replace(&usd_eur, &mut db)?;
-        exchange_rate::insert_or_replace(&rub_eur, &mut db)?;
+        repo.insert_or_replace(&usd_eur)?;
+        repo.insert_or_replace(&rub_eur)?;
 
         let rub_usd = ExchangeRate {
             quote: "RUB".into(),

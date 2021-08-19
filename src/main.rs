@@ -10,7 +10,7 @@ mod test;
 
 use crate::{
     model::ApiError,
-    repository::{AuthTokenRepository, UserRepository},
+    repository::{AuthTokenRepository, ExchangeRateRepository, UserRepository},
 };
 use anyhow::Result;
 use db::Db;
@@ -98,7 +98,8 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     warn!(?db_url);
 
     let user_repo = UserRepository::new(Connection::open(db_url).unwrap());
-    let auth_token_repo = AuthTokenRepository::new(Connection::open(db_url).unwrap());
+    let token_repo = AuthTokenRepository::new(Connection::open(db_url).unwrap());
+    let rate_repo = ExchangeRateRepository::new(Connection::open(db_url).unwrap());
 
     rocket
         .mount(
@@ -112,7 +113,8 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
         .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
         .manage(user_repo)
-        .manage(auth_token_repo)
+        .manage(token_repo)
+        .manage(rate_repo)
         .register("/", catchers![default_catcher])
 }
 

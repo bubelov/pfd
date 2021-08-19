@@ -1,6 +1,7 @@
 use crate::{
     conf::{Conf, Migration},
     provider::{Ecb, Iex, Provider},
+    repository::ExchangeRateRepository,
 };
 use anyhow::Result;
 use figment::Figment;
@@ -130,8 +131,14 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
 
 async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     let conf = Conf::new()?;
-    let ecb = Ecb::new(conf.providers.ecb, connect(rocket_conf)?);
-    let iex = Iex::new(conf.providers.iex, connect(rocket_conf)?);
+    let ecb = Ecb::new(
+        conf.providers.ecb,
+        ExchangeRateRepository::new(connect(rocket_conf)?),
+    );
+    let iex = Iex::new(
+        conf.providers.iex,
+        ExchangeRateRepository::new(connect(rocket_conf)?),
+    );
 
     match args.len() {
         0 => {

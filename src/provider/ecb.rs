@@ -1,16 +1,12 @@
-use crate::{model::ExchangeRate, provider::Provider, repository::exchange_rate};
+use crate::{model::ExchangeRate, provider::Provider, repository::ExchangeRateRepository};
 use anyhow::Result;
-use rusqlite::Connection;
 use serde::Deserialize;
-use std::{
-    io::{copy, Cursor},
-    sync::Mutex,
-};
+use std::io::{copy, Cursor};
 use zip::ZipArchive;
 
 pub struct Ecb {
     conf: EcbConf,
-    conn: Mutex<Connection>,
+    repo: ExchangeRateRepository,
 }
 
 #[derive(Deserialize)]
@@ -20,10 +16,10 @@ pub struct EcbConf {
 }
 
 impl Ecb {
-    pub fn new(conf: EcbConf, conn: Connection) -> Ecb {
+    pub fn new(conf: EcbConf, repo: ExchangeRateRepository) -> Ecb {
         Ecb {
             conf: conf,
-            conn: Mutex::new(conn),
+            repo: repo,
         }
     }
 }
@@ -68,7 +64,7 @@ impl Provider for Ecb {
             .collect();
 
         for rate in rates {
-            exchange_rate::insert_or_replace(&rate, &mut self.conn.lock().unwrap())?;
+            self.repo.insert_or_replace(&rate)?;
         }
 
         Ok(())

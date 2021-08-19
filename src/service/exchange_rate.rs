@@ -1,28 +1,18 @@
-use crate::{db::Db, model::ExchangeRate, repository::exchange_rate};
+use crate::{model::ExchangeRate, repository::ExchangeRateRepository};
 use anyhow::Result;
 
-pub async fn get_by_quote_and_base(
+pub fn get_by_quote_and_base(
     quote: &str,
     base: &str,
-    db: Db,
+    repo: &ExchangeRateRepository,
 ) -> Result<Option<ExchangeRate>> {
-    let quote_owned = quote.to_string();
-    let base_owned = base.to_string();
-
-    let rate = db
-        .run(move |conn| exchange_rate::select_by_quote_and_base(&quote_owned, &base_owned, conn))
-        .await;
+    let rate = repo.select_by_quote_and_base(&quote, &base);
 
     if let Some(v) = rate? {
         return Ok(Some(v));
     }
 
-    let quote_owned = quote.to_string();
-    let base_owned = base.to_string();
-
-    let rate = db
-        .run(move |conn| exchange_rate::select_by_quote_and_base(&base_owned, &quote_owned, conn))
-        .await;
+    let rate = repo.select_by_quote_and_base(&base, &quote);
 
     if let Some(v) = rate? {
         return Ok(Some(ExchangeRate {
@@ -32,18 +22,8 @@ pub async fn get_by_quote_and_base(
         }));
     }
 
-    let quote_owned = quote.to_string();
-    let base_owned = base.to_string();
-    let indirect_rate_1 = db
-        .run(move |conn| {
-            exchange_rate::select_by_quote_and_base(&quote_owned, &"EUR".to_string(), conn)
-        })
-        .await?;
-    let indirect_rate_2 = db
-        .run(move |conn| {
-            exchange_rate::select_by_quote_and_base(&base_owned, &"EUR".to_string(), conn)
-        })
-        .await?;
+    let indirect_rate_1 = repo.select_by_quote_and_base(&quote, &"EUR".to_string())?;
+    let indirect_rate_2 = repo.select_by_quote_and_base(&base, &"EUR".to_string())?;
 
     if indirect_rate_1.is_some() && indirect_rate_2.is_some() {
         return Ok(Some(ExchangeRate {
