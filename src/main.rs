@@ -33,7 +33,13 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     if env::var("DATA_DIR").is_err() {
-        let dir = dirs::home_dir().unwrap().join(".pfd");
+        let dir = dirs::home_dir()
+            .unwrap_or_else(|| {
+                error!("Can't find home directory");
+                exit(1);
+            })
+            .join(".pfd");
+
         env::set_var("DATA_DIR", dir.to_str().unwrap());
     }
 
