@@ -6,13 +6,9 @@ use crate::{
 use anyhow::Result;
 use figment::Figment;
 use futures::future::join_all;
-use rocket_sync_db_pools::database;
 use rusqlite::Connection;
 use std::{fs::remove_file, process::exit};
 use tracing::{error, info, warn};
-
-#[database("main")]
-pub struct Db(Connection);
 
 #[derive(Debug)]
 pub enum DbVersion {

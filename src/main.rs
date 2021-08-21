@@ -13,7 +13,6 @@ use crate::{
     repository::{AuthTokenRepository, ExchangeRateRepository, UserRepository},
 };
 use anyhow::Result;
-use db::Db;
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
 };
@@ -92,7 +91,6 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
                 controller::auth_token::post
             ],
         )
-        .attach(Db::fairing())
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
         .manage(user_repo)
         .manage(token_repo)
@@ -101,14 +99,15 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
 }
 
 async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
-    let db = Db::get_one(&rocket).await.unwrap();
-    db.run(move |conn| {
-        db::migrate_to_latest(conn).unwrap_or_else(|e| {
-            error!(%e, "Migration failed");
-            exit(1);
-        })
-    })
-    .await;
+    let db_url = rocket.figment().find_value("databases.main.url").unwrap();
+    let db_url = db_url.as_str().unwrap();
+    let mut conn = Connection::open(db_url).unwrap();
+
+    db::migrate_to_latest(&mut conn).unwrap_or_else(|e| {
+        error!(%e, "Migration failed");
+        exit(1);
+    });
+
     rocket
 }
 
