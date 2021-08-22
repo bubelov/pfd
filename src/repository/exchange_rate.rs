@@ -1,24 +1,23 @@
 use crate::model::ExchangeRate;
 use anyhow::Error;
-use rusqlite::{params, Connection, OptionalExtension};
-use std::sync::Mutex;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::{params, OptionalExtension};
 
 pub struct ExchangeRateRepository {
-    conn: Mutex<Connection>,
+    pool: Pool<SqliteConnectionManager>,
 }
 
 impl ExchangeRateRepository {
-    pub fn new(conn: Connection) -> ExchangeRateRepository {
-        ExchangeRateRepository {
-            conn: Mutex::new(conn),
-        }
+    pub fn new(pool: Pool<SqliteConnectionManager>) -> ExchangeRateRepository {
+        ExchangeRateRepository { pool: pool }
     }
 
     pub fn insert_or_replace(&self, row: &ExchangeRate) -> anyhow::Result<()> {
         let query = "INSERT OR REPLACE INTO exchange_rate (quote, base, rate) VALUES (?, ?, ?)";
         let params = params![&row.quote, &row.base, row.rate];
-        self.conn
-            .lock()
+        self.pool
+            .get()
             .unwrap()
             .execute(query, params)
             .map(|_| ())
@@ -30,8 +29,8 @@ impl ExchangeRateRepository {
         quote: &str,
         base: &str,
     ) -> anyhow::Result<Option<ExchangeRate>> {
-        self.conn
-            .lock()
+        self.pool
+            .get()
             .unwrap()
             .query_row(
                 "SELECT rate FROM exchange_rate WHERE quote = ? AND base = ?",
@@ -51,19 +50,19 @@ impl ExchangeRateRepository {
 
 #[cfg(test)]
 mod test {
-    use crate::{model::ExchangeRate, repository::ExchangeRateRepository, test::db};
+    use crate::{model::ExchangeRate, repository::ExchangeRateRepository, test::pool};
     use anyhow::Result;
 
     #[test]
     fn insert_or_replace() -> Result<()> {
-        let repo = ExchangeRateRepository::new(db());
+        let repo = ExchangeRateRepository::new(pool());
         repo.insert_or_replace(&rate())?;
         Ok(())
     }
 
     #[test]
     fn select_by_quote_and_base() -> Result<()> {
-        let repo = ExchangeRateRepository::new(db());
+        let repo = ExchangeRateRepository::new(pool());
         let row = rate();
         let res = repo.select_by_quote_and_base(&row.quote, &row.base)?;
         assert!(res.is_none());

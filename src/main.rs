@@ -13,6 +13,8 @@ use crate::{
     repository::{AuthTokenRepository, ExchangeRateRepository, UserRepository},
 };
 use anyhow::Result;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use rocket::{
     catch, catchers, fairing::AdHoc, http::Status, routes, Build, Config, Request, Rocket,
 };
@@ -84,9 +86,12 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     let db_url = db_url.as_str().unwrap();
     warn!(?db_url);
 
-    let user_repo = UserRepository::new(Connection::open(db_url).unwrap());
-    let token_repo = AuthTokenRepository::new(Connection::open(db_url).unwrap());
-    let rate_repo = ExchangeRateRepository::new(Connection::open(db_url).unwrap());
+    let conn_manager = SqliteConnectionManager::file(db_url);
+    let pool = Pool::new(conn_manager).unwrap();
+
+    let user_repo = UserRepository::new(pool.clone());
+    let token_repo = AuthTokenRepository::new(pool.clone());
+    let rate_repo = ExchangeRateRepository::new(pool.clone());
 
     rocket
         .mount(

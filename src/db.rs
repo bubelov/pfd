@@ -3,9 +3,11 @@ use crate::{
     provider::{Ecb, Iex, Provider},
     repository::ExchangeRateRepository,
 };
-use anyhow::Result;
+use anyhow::{Error, Result};
 use figment::Figment;
 use futures::future::join_all;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
 use std::{fs::remove_file, process::exit};
 use tracing::{error, info, warn};
@@ -127,13 +129,15 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
 
 async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     let conf = Conf::new()?;
+    let pool = pool(rocket_conf)?;
+
     let ecb = Ecb::new(
         conf.providers.ecb,
-        ExchangeRateRepository::new(connect(rocket_conf)?),
+        ExchangeRateRepository::new(pool.clone()),
     );
     let iex = Iex::new(
         conf.providers.iex,
-        ExchangeRateRepository::new(connect(rocket_conf)?),
+        ExchangeRateRepository::new(pool.clone()),
     );
 
     match args.len() {
@@ -169,6 +173,13 @@ pub fn connect(conf: &Figment) -> Result<Connection> {
         "Invalid database path",
     ))?;
     Ok(Connection::open(path)?)
+}
+
+pub fn pool(rocket_conf: &Figment) -> Result<Pool<SqliteConnectionManager>> {
+    let url: figment::value::Value = rocket_conf.find_value("databases.main.url")?;
+    let url: &str = url.as_str().ok_or(Error::msg("Invalid database URL"))?;
+    let manager = SqliteConnectionManager::file(url);
+    Ok(Pool::new(manager)?)
 }
 
 fn schema_version(conn: &Connection) -> rusqlite::Result<i16> {

@@ -101,7 +101,6 @@ mod test {
     };
     use anyhow::Result;
     use rocket::http::Status;
-    use rusqlite::Connection;
 
     #[test]
     fn post() -> Result<()> {
@@ -137,15 +136,8 @@ mod test {
             password: "test2".into(),
         };
         client.post("/users").json(&input).dispatch();
-        let db_url = client
-            .rocket()
-            .figment()
-            .find_value("databases.main.url")
-            .unwrap();
-        let db_url = db_url.as_str().unwrap();
-        let user = UserRepository::new(Connection::open(db_url).unwrap())
-            .select_by_username(&input.password)?
-            .unwrap();
+        let user_repo = client.rocket().state::<UserRepository>().unwrap();
+        let user = user_repo.select_by_username(&input.password)?.unwrap();
         assert_ne!(
             user.password_hash, input.password,
             "Password was stored in plaintext!"

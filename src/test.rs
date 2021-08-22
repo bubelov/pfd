@@ -4,6 +4,8 @@ use crate::{
     prepare,
     repository::{AuthTokenRepository, UserRepository},
 };
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use rocket::{fairing::AdHoc, http::Header, local::blocking::Client};
 use rusqlite::Connection;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -50,10 +52,11 @@ pub fn client() -> Client {
     client
 }
 
-pub fn db() -> Connection {
+pub fn pool() -> Pool<SqliteConnectionManager> {
     let db_name = COUNTER.fetch_add(1, Ordering::Relaxed);
     let db_url = format!("file::testdb_{}:?mode=memory&cache=shared", db_name);
     let mut conn = Connection::open(&db_url).unwrap();
     migrate_to_latest(&mut conn).unwrap();
-    conn
+    let manager = SqliteConnectionManager::file(&db_url);
+    Pool::new(manager).unwrap()
 }
