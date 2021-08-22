@@ -4,13 +4,14 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
 
+#[derive(Clone)]
 pub struct UserRepository {
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl UserRepository {
-    pub fn new(pool: Pool<SqliteConnectionManager>) -> UserRepository {
-        UserRepository { pool: pool }
+    pub fn new(pool: &Pool<SqliteConnectionManager>) -> UserRepository {
+        UserRepository { pool: pool.clone() }
     }
 
     pub fn insert(&self, row: &User) -> Result<()> {
@@ -52,14 +53,14 @@ mod test {
 
     #[test]
     fn insert() -> Result<()> {
-        let repo = UserRepository::new(pool());
+        let repo = UserRepository::new(&pool());
         repo.insert(&user())?;
         Ok(())
     }
 
     #[test]
     fn select_by_username() -> Result<()> {
-        let repo = UserRepository::new(pool());
+        let repo = UserRepository::new(&pool());
         let row = user();
         let res = repo.select_by_username(&row.username)?;
         assert!(res.is_none());

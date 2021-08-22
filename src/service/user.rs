@@ -1,10 +1,20 @@
 use crate::{model::User, repository::UserRepository};
 use anyhow::Result;
 
-pub fn insert(user: &User, repo: &UserRepository) -> Result<()> {
-    repo.insert(&user)
+pub struct UserService {
+    repo: UserRepository,
 }
 
-pub fn select_by_username(username: &str, repo: &UserRepository) -> Result<Option<User>> {
-    repo.select_by_username(&username)
+impl UserService {
+    pub fn new(repo: &UserRepository) -> UserService {
+        UserService { repo: repo.clone() }
+    }
+
+    pub fn insert(&self, user: &User) -> Result<()> {
+        self.repo.insert(&user)
+    }
+
+    pub fn select_by_username(&self, username: &str) -> Result<Option<User>> {
+        self.repo.select_by_username(&username)
+    }
 }

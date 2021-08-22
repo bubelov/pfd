@@ -11,6 +11,7 @@ mod test;
 use crate::{
     model::ApiError,
     repository::{AuthTokenRepository, ExchangeRateRepository, UserRepository},
+    service::{AuthTokenService, ExchangeRateService, UserService},
 };
 use anyhow::Result;
 use r2d2::Pool;
@@ -89,9 +90,12 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
     let conn_manager = SqliteConnectionManager::file(db_url);
     let pool = Pool::new(conn_manager).unwrap();
 
-    let user_repo = UserRepository::new(pool.clone());
-    let token_repo = AuthTokenRepository::new(pool.clone());
-    let rate_repo = ExchangeRateRepository::new(pool.clone());
+    let user_repo = UserRepository::new(&pool);
+    let user_service = UserService::new(&user_repo);
+    let token_repo = AuthTokenRepository::new(&pool);
+    let token_service = AuthTokenService::new(&token_repo);
+    let rate_repo = ExchangeRateRepository::new(&pool);
+    let rate_service = ExchangeRateService::new(&rate_repo);
 
     rocket
         .mount(
@@ -104,8 +108,11 @@ fn prepare(rocket: Rocket<Build>) -> Rocket<Build> {
         )
         .attach(AdHoc::on_ignite("Run migrations", run_migrations))
         .manage(user_repo)
+        .manage(user_service)
         .manage(token_repo)
+        .manage(token_service)
         .manage(rate_repo)
+        .manage(rate_service)
         .register("/", catchers![default_catcher])
 }
 

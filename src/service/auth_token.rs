@@ -4,10 +4,20 @@ use crate::{
 };
 use anyhow::Result;
 
-pub fn insert(item: &AuthToken, repo: &AuthTokenRepository) -> Result<()> {
-    repo.insert(item)
+pub struct AuthTokenService {
+    repo: AuthTokenRepository,
 }
 
-pub fn select_by_id(id: &Id, repo: &AuthTokenRepository) -> Result<Option<AuthToken>> {
-    repo.select_by_id(id)
+impl AuthTokenService {
+    pub fn new(repo: &AuthTokenRepository) -> AuthTokenService {
+        AuthTokenService { repo: repo.clone() }
+    }
+
+    pub fn insert(&self, item: &AuthToken) -> Result<()> {
+        self.repo.insert(item)
+    }
+
+    pub fn select_by_id(&self, id: &Id) -> Result<Option<AuthToken>> {
+        self.repo.select_by_id(id)
+    }
 }

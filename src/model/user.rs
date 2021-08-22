@@ -1,7 +1,6 @@
 use crate::{
     model::Id,
-    repository::{AuthTokenRepository, UserRepository},
-    service::{auth_token, user},
+    service::{AuthTokenService, UserService},
 };
 use rocket::{
     http::Status,
@@ -50,8 +49,8 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::BadRequest, ()));
         }
 
-        let user_repo = try_outcome!(req.guard::<&rocket::State<UserRepository>>().await);
-        let token_repo = try_outcome!(req.guard::<&rocket::State<AuthTokenRepository>>().await);
+        let user_service = try_outcome!(req.guard::<&rocket::State<UserService>>().await);
+        let token_service = try_outcome!(req.guard::<&rocket::State<AuthTokenService>>().await);
 
         let token_id = auth_credentials.parse::<Id>();
 
@@ -59,7 +58,7 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::BadRequest, ()));
         }
 
-        let token = auth_token::select_by_id(&token_id.unwrap(), token_repo);
+        let token = token_service.select_by_id(&token_id.unwrap());
 
         if let Err(_) = token {
             return Outcome::Failure((Status::InternalServerError, ()));
@@ -71,7 +70,7 @@ impl<'r> FromRequest<'r> for User {
             return Outcome::Failure((Status::Unauthorized, ()));
         }
 
-        return match user::select_by_username(&token.unwrap().username, user_repo) {
+        return match user_service.select_by_username(&token.unwrap().username) {
             Ok(user) => match user {
                 Some(user) => Outcome::Success(user),
                 None => Outcome::Failure((Status::BadRequest, ())),

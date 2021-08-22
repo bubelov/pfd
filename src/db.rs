@@ -131,14 +131,8 @@ async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     let conf = Conf::new()?;
     let pool = pool(rocket_conf)?;
 
-    let ecb = Ecb::new(
-        conf.providers.ecb,
-        ExchangeRateRepository::new(pool.clone()),
-    );
-    let iex = Iex::new(
-        conf.providers.iex,
-        ExchangeRateRepository::new(pool.clone()),
-    );
+    let ecb = Ecb::new(conf.providers.ecb, ExchangeRateRepository::new(&pool));
+    let iex = Iex::new(conf.providers.iex, ExchangeRateRepository::new(&pool));
 
     match args.len() {
         0 => {

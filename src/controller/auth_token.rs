@@ -1,7 +1,6 @@
 use crate::{
     model::{ApiError, ApiResult, AuthToken, Id, User},
-    repository::{AuthTokenRepository, UserRepository},
-    service::{auth_token, user},
+    service::{AuthTokenService, UserService},
 };
 use rocket::{post, serde::json::Json, State};
 use serde::{Deserialize, Serialize};
@@ -47,10 +46,10 @@ impl From<AuthToken> for AuthTokenView {
 #[post("/auth_tokens", data = "<input>")]
 pub async fn post(
     input: Json<PostInput>,
-    auth_token_repo: &State<AuthTokenRepository>,
-    user_repo: &State<UserRepository>,
+    auth_token_service: &State<AuthTokenService>,
+    user_service: &State<UserService>,
 ) -> ApiResult<PostOutput> {
-    let user = user::select_by_username(&input.username, user_repo);
+    let user = user_service.select_by_username(&input.username);
 
     if let Err(e) = user {
         return e.into();
@@ -76,7 +75,7 @@ pub async fn post(
         username: user.username.clone(),
     };
 
-    if let Err(e) = auth_token::insert(&auth_token, auth_token_repo) {
+    if let Err(e) = auth_token_service.insert(&auth_token) {
         return e.into();
     }
 

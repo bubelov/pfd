@@ -4,13 +4,14 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
 
+#[derive(Clone)]
 pub struct AuthTokenRepository {
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl AuthTokenRepository {
-    pub fn new(pool: Pool<SqliteConnectionManager>) -> AuthTokenRepository {
-        AuthTokenRepository { pool: pool }
+    pub fn new(pool: &Pool<SqliteConnectionManager>) -> AuthTokenRepository {
+        AuthTokenRepository { pool: pool.clone() }
     }
 
     pub fn insert(&self, row: &AuthToken) -> anyhow::Result<()> {
@@ -51,14 +52,14 @@ mod test {
 
     #[test]
     fn insert() -> Result<()> {
-        let repo = AuthTokenRepository::new(pool());
+        let repo = AuthTokenRepository::new(&pool());
         repo.insert(&token())?;
         Ok(())
     }
 
     #[test]
     fn select_by_id() -> Result<()> {
-        let repo = AuthTokenRepository::new(pool());
+        let repo = AuthTokenRepository::new(&pool());
         let row = token();
         let res = repo.select_by_id(&row.id)?;
         assert!(res.is_none());

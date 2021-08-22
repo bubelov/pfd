@@ -4,13 +4,14 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
 
+#[derive(Clone)]
 pub struct ExchangeRateRepository {
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl ExchangeRateRepository {
-    pub fn new(pool: Pool<SqliteConnectionManager>) -> ExchangeRateRepository {
-        ExchangeRateRepository { pool: pool }
+    pub fn new(pool: &Pool<SqliteConnectionManager>) -> ExchangeRateRepository {
+        ExchangeRateRepository { pool: pool.clone() }
     }
 
     pub fn insert_or_replace(&self, row: &ExchangeRate) -> anyhow::Result<()> {
@@ -55,14 +56,14 @@ mod test {
 
     #[test]
     fn insert_or_replace() -> Result<()> {
-        let repo = ExchangeRateRepository::new(pool());
+        let repo = ExchangeRateRepository::new(&pool());
         repo.insert_or_replace(&rate())?;
         Ok(())
     }
 
     #[test]
     fn select_by_quote_and_base() -> Result<()> {
-        let repo = ExchangeRateRepository::new(pool());
+        let repo = ExchangeRateRepository::new(&pool());
         let row = rate();
         let res = repo.select_by_quote_and_base(&row.quote, &row.base)?;
         assert!(res.is_none());

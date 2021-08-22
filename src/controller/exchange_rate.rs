@@ -1,7 +1,6 @@
 use crate::{
     model::{ApiResult, ExchangeRate, User},
-    repository::ExchangeRateRepository,
-    service::exchange_rate,
+    service::ExchangeRateService,
 };
 use rocket::{get, State};
 
@@ -9,10 +8,10 @@ use rocket::{get, State};
 pub async fn get(
     quote: &str,
     base: &str,
-    repo: &State<ExchangeRateRepository>,
+    service: &State<ExchangeRateService>,
     _user: User,
 ) -> ApiResult<ExchangeRate> {
-    exchange_rate::get_by_quote_and_base(quote, base, repo).into()
+    service.get_by_quote_and_base(quote, base).into()
 }
 
 #[cfg(test)]
