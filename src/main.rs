@@ -23,6 +23,7 @@ use std::{
     process::exit,
 };
 use tracing::{error, warn};
+use tracing_subscriber::EnvFilter;
 
 #[rocket::main]
 async fn main() {
@@ -31,10 +32,12 @@ async fn main() {
     }
 
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info");
+        env::set_var("RUST_LOG", "info,rocket=warn,_=warn");
     }
 
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     let args: Vec<String> = env::args().collect();
     warn!(data_dir = ?init_data_dir(), ?args, "Starting up");
@@ -43,10 +46,15 @@ async fn main() {
 
 async fn cli(args: &[String]) {
     match args.len() {
-        0 => attach_payload(rocket::build(), Conf::new().unwrap())
-            .launch()
-            .await
-            .unwrap(),
+        0 => {
+            env::set_var("ROCKET_CLI_COLORS", "false");
+            env::set_var("ROCKET_LOG_LEVEL", "critical");
+
+            attach_payload(rocket::build(), Conf::new().unwrap())
+                .launch()
+                .await
+                .unwrap();
+        }
         _ => match args.get(0).unwrap().as_str() {
             "db" => db::cli(&args[1..]).await,
             _ => {

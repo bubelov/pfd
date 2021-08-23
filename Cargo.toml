@@ -12,7 +12,7 @@ dirs = "3.0.2"
 figment = "0.10.6"
 serde = { version = "1.0.127", features = ["derive"] }
 uuid = { version = "0.8.2", features = ["v4", "serde"] }
-rocket = { version = "0.5.0-rc.1", features = [ "json" ] }
+rocket = { version = "0.5.0-rc.1", features = [ "json", "tls" ] }
 rusqlite = "0.25.3"
 reqwest = { version = "0.11.4", default-features = false, features = [ "rustls-tls", "json" ] }
 zip = "0.5.13"
