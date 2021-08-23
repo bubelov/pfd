@@ -18,8 +18,9 @@ pub async fn get(
 mod test {
     use crate::{model::ExchangeRate, test::client, ExchangeRateRepository};
     use anyhow::Result;
+    use r2d2::Pool;
+    use r2d2_sqlite::SqliteConnectionManager;
     use rocket::http::Status;
-    use rusqlite::Connection;
 
     #[test]
     fn get() -> Result<()> {
@@ -116,14 +117,11 @@ mod test {
     #[test]
     fn get_unauthorized() {
         let client = client();
-        let db_url = client
-            .rocket()
-            .figment()
-            .find_value("databases.main.url")
+        let pool: &Pool<SqliteConnectionManager> = client.rocket().state().unwrap();
+        pool.get()
+            .unwrap()
+            .execute_batch("DELETE FROM auth_token")
             .unwrap();
-        let db_url = db_url.as_str().unwrap();
-        let conn = Connection::open(&db_url).unwrap();
-        conn.execute_batch("DELETE FROM auth_token").unwrap();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::Unauthorized);
     }
@@ -138,14 +136,11 @@ mod test {
     #[test]
     fn get_sql_query_failed() {
         let client = client();
-        let db_url = client
-            .rocket()
-            .figment()
-            .find_value("databases.main.url")
+        let pool: &Pool<SqliteConnectionManager> = client.rocket().state().unwrap();
+        pool.get()
+            .unwrap()
+            .execute_batch("DROP TABLE exchange_rate")
             .unwrap();
-        let db_url = db_url.as_str().unwrap();
-        let conn = Connection::open(&db_url).unwrap();
-        conn.execute_batch("DROP TABLE exchange_rate").unwrap();
         let res = client.get("/exchange_rates?quote=EUR&base=USD").dispatch();
         assert_eq!(res.status(), Status::InternalServerError);
     }

@@ -12,6 +12,7 @@ use std::{
 
 #[derive(Deserialize)]
 pub struct Conf {
+    pub db_url: String,
     pub providers: ProvidersConf,
     pub migrations: Vec<Migration>,
 }
@@ -31,9 +32,15 @@ pub struct Migration {
 
 impl Conf {
     pub fn new() -> Result<Conf> {
-        let default_conf = include_bytes!("../pfd.conf");
-        let default_conf = String::from_utf8_lossy(default_conf);
-        let conf = Figment::new().merge(Toml::string(&default_conf));
+        let db_url = env::var("DATA_DIR").unwrap();
+        let db_url = Path::new(&db_url).join("pfd.db");
+
+        let conf = include_bytes!("../pfd.conf");
+        let conf = String::from_utf8_lossy(conf);
+
+        let conf = Figment::new()
+            .merge(Toml::string(&conf))
+            .merge(("db_url", db_url));
 
         let conf = match env::var("DATA_DIR") {
             Ok(data_dir) => {

@@ -3,8 +3,7 @@ use crate::{
     provider::{Ecb, Iex, Provider},
     repository::ExchangeRateRepository,
 };
-use anyhow::{Error, Result};
-use figment::Figment;
+use anyhow::Result;
 use futures::future::join_all;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -18,52 +17,45 @@ pub enum DbVersion {
     Latest,
 }
 
-pub async fn cli(args: &[String], conf: &Figment) {
-    let action = args.get(0).unwrap_or_else(|| {
-        error!(?args, "Database action is not specified");
+pub async fn cli(args: &[String]) {
+    let first_arg = args.first().unwrap_or_else(|| {
+        error!("No args provided");
         exit(1);
     });
 
-    match action.as_str() {
-        "drop" => drop(conf).unwrap_or_else(|e| {
+    match first_arg.as_str() {
+        "drop" => drop().unwrap_or_else(|e| {
             error!(%e, "Unable drop database");
             exit(1);
         }),
         "migrate" => {
-            let mut conn = connect(conf).unwrap_or_else(|e| {
-                error!(%e, "Can't connect to database");
-                exit(1);
-            });
             let version = match args.get(1) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
                 None => DbVersion::Latest,
             };
-            migrate(&mut conn, version).unwrap_or_else(|e| {
+            let pool = pool().unwrap();
+            migrate(&mut pool.get().unwrap(), version).unwrap_or_else(|e| {
                 error!(%e, "Migration failed");
                 exit(1);
             });
         }
-        "sync" => sync(&args[1..], conf).await.unwrap_or_else(|e| {
+        "sync" => sync(&args[1..]).await.unwrap_or_else(|e| {
             error!(%e, "Sync failed");
             exit(1);
         }),
         _ => {
-            error!(%action, ?args, "Unknown action");
+            error!(?args, "Unknown argument");
             exit(1);
         }
     };
 }
 
-fn drop(conf: &Figment) -> Result<()> {
-    info!("Dropping database...");
-    let path = conf.find_value("databases.main.url")?;
-    let path = path.as_str().ok_or(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Invalid database path",
-    ))?;
-    info!(%path, "Found db path");
-    remove_file(path)?;
-    info!("Database has been dropped");
+fn drop() -> Result<()> {
+    warn!("Dropping database...");
+    let db_url = Conf::new()?.db_url;
+    info!(%db_url);
+    remove_file(db_url)?;
+    warn!("Database has been dropped");
     Ok(())
 }
 
@@ -127,9 +119,9 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     Ok(())
 }
 
-async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
+async fn sync(args: &[String]) -> Result<()> {
     let conf = Conf::new()?;
-    let pool = pool(rocket_conf)?;
+    let pool = pool()?;
 
     let ecb = Ecb::new(conf.providers.ecb, ExchangeRateRepository::new(&pool));
     let iex = Iex::new(conf.providers.iex, ExchangeRateRepository::new(&pool));
@@ -160,19 +152,9 @@ async fn sync(args: &[String], rocket_conf: &Figment) -> Result<()> {
     Ok(())
 }
 
-pub fn connect(conf: &Figment) -> Result<Connection> {
-    let path = conf.find_value("databases.main.url")?;
-    let path = path.as_str().ok_or(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Invalid database path",
-    ))?;
-    Ok(Connection::open(path)?)
-}
-
-pub fn pool(rocket_conf: &Figment) -> Result<Pool<SqliteConnectionManager>> {
-    let url: figment::value::Value = rocket_conf.find_value("databases.main.url")?;
-    let url: &str = url.as_str().ok_or(Error::msg("Invalid database URL"))?;
-    let manager = SqliteConnectionManager::file(url);
+pub fn pool() -> Result<Pool<SqliteConnectionManager>> {
+    let db_url = Conf::new()?.db_url;
+    let manager = SqliteConnectionManager::file(db_url);
     Ok(Pool::new(manager)?)
 }
 
