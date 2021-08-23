@@ -14,49 +14,31 @@ use crate::{
     repository::{AuthTokenRepository, ExchangeRateRepository, UserRepository},
     service::{AuthTokenService, ExchangeRateService, UserService},
 };
-use anyhow::Result;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rocket::{catch, catchers, fairing::AdHoc, http::Status, routes, Build, Request, Rocket};
-use std::{env, path::Path, process::exit};
+use std::{
+    env::{self, VarError},
+    path::Path,
+    process::exit,
+};
 use tracing::{error, warn};
 
 #[rocket::main]
-async fn main() -> Result<()> {
+async fn main() {
     if env::var("RUST_BACKTRACE").is_err() {
         env::set_var("RUST_BACKTRACE", "1");
     }
 
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info")
+        env::set_var("RUST_LOG", "info");
     }
 
     tracing_subscriber::fmt::init();
 
-    if env::var("DATA_DIR").is_err() {
-        let dir = dirs::home_dir()
-            .unwrap_or_else(|| {
-                error!("Can't find home directory");
-                exit(1);
-            })
-            .join(".pfd");
-
-        env::set_var("DATA_DIR", dir.to_str().unwrap());
-    }
-
-    let data_dir = env::var("DATA_DIR")?;
-    let data_dir = Path::new(&data_dir);
-
-    if !data_dir.exists() {
-        std::fs::create_dir_all(data_dir).unwrap();
-    }
-
     let args: Vec<String> = env::args().collect();
-    warn!("Starting up");
-    warn!(data_dir = %data_dir.display());
-    warn!(?args);
+    warn!(data_dir = ?init_data_dir(), ?args, "Starting up");
     cli(&args[1..]).await;
-    Ok(())
 }
 
 async fn cli(args: &[String]) {
@@ -120,4 +102,46 @@ async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
 #[catch(default)]
 fn default_catcher(status: Status, _request: &Request) -> ApiError {
     status.into()
+}
+
+fn init_data_dir() -> String {
+    match env::var("DATA_DIR") {
+        Ok(data_dir) => {
+            if Path::new(&data_dir).exists() {
+                data_dir
+            } else {
+                error!(?data_dir, "Data dir doesn't exist");
+                exit(1);
+            }
+        }
+        Err(e) => match e {
+            VarError::NotPresent => {
+                let data_dir = dirs::home_dir()
+                    .unwrap_or_else(|| {
+                        error!("Can't find home directory");
+                        exit(1);
+                    })
+                    .join(".pfd");
+
+                if !data_dir.exists() {
+                    std::fs::create_dir_all(&data_dir).unwrap_or_else(|e| {
+                        error!(?e, ?data_dir, "Failed to create data dir");
+                        exit(1);
+                    });
+                }
+
+                let data_dir = data_dir.to_str().unwrap_or_else(|| {
+                    error!("Home dir path is not unicode");
+                    exit(1);
+                });
+
+                env::set_var("DATA_DIR", data_dir);
+                data_dir.into()
+            }
+            VarError::NotUnicode(ref os_string) => {
+                error!(%e, ?os_string, "DATA_DIR is not unicode");
+                exit(1);
+            }
+        },
+    }
 }
