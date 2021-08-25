@@ -32,7 +32,7 @@ async fn main() {
     }
 
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info,rocket=warn,_=warn");
+        env::set_var("RUST_LOG", "info");
     }
 
     tracing_subscriber::fmt::fmt()
@@ -47,13 +47,18 @@ async fn main() {
 async fn cli(args: &[String]) {
     match args.len() {
         0 => {
-            env::set_var("ROCKET_CLI_COLORS", "false");
-            env::set_var("ROCKET_LOG_LEVEL", "critical");
+            let conf = Conf::new().unwrap_or_else(|e| {
+                error!(?e, "Failed to read configuration");
+                exit(1);
+            });
 
-            attach_payload(rocket::build(), Conf::new().unwrap())
-                .launch()
-                .await
-                .unwrap();
+            let server: Result<(), rocket::Error> =
+                attach_payload(rocket::build(), conf).launch().await;
+
+            if let Err(e) = server {
+                error!(?e, "Failed to start a server");
+                exit(1);
+            }
         }
         _ => match args.get(0).unwrap().as_str() {
             "db" => db::cli(&args[1..]).await,

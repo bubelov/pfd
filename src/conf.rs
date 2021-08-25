@@ -1,5 +1,5 @@
 use crate::provider::{EcbConf, IexConf};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use figment::{
     providers::{Format, Toml},
     Figment,
@@ -32,7 +32,7 @@ pub struct Migration {
 
 impl Conf {
     pub fn new() -> Result<Conf> {
-        let db_url = env::var("DATA_DIR").unwrap();
+        let db_url = env::var("DATA_DIR").with_context(|| "DATA_DIR isn't set")?;
         let db_url = Path::new(&db_url).join("pfd.db");
 
         let conf = include_bytes!("../pfd.conf");
@@ -50,7 +50,8 @@ impl Conf {
             Err(_) => conf,
         };
 
-        let conf: Conf = conf.extract()?;
-        Ok(conf)
+        Ok(conf
+            .extract()
+            .with_context(|| "Failed to deserialize config")?)
     }
 }
