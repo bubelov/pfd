@@ -3,7 +3,7 @@ use crate::{
     provider::{Ecb, Iex, Provider},
     repository::ExchangeRateRepository,
 };
-use anyhow::Result;
+use anyhow::{Context, Error, Result};
 use futures::future::join_all;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -17,17 +17,11 @@ pub enum DbVersion {
     Latest,
 }
 
-pub async fn cli(args: &[String]) {
-    let first_arg = args.first().unwrap_or_else(|| {
-        error!("No args provided");
-        exit(1);
-    });
+pub async fn cli(args: &[String]) -> Result<()> {
+    let first_arg = args.first().ok_or(Error::msg("No args provided"))?;
 
     match first_arg.as_str() {
-        "drop" => drop().unwrap_or_else(|e| {
-            error!(%e, "Unable drop database");
-            exit(1);
-        }),
+        "drop" => drop().context("Unable to drop database")?,
         "migrate" => {
             let version = match args.get(1) {
                 Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
@@ -48,12 +42,13 @@ pub async fn cli(args: &[String]) {
             exit(1);
         }
     };
+
+    Ok(())
 }
 
 fn drop() -> Result<()> {
-    warn!("Dropping database...");
     let db_url = Conf::new()?.db_url;
-    info!(%db_url);
+    warn!(?db_url, "Dropping database");
     remove_file(db_url)?;
     warn!("Database has been dropped");
     Ok(())

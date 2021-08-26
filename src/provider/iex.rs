@@ -21,8 +21,8 @@ struct IexCryptoQuote {
 }
 
 impl Iex {
-    pub fn new(conf: IexConf, repo: ExchangeRateRepository) -> Iex {
-        Iex {
+    pub fn new(conf: IexConf, repo: ExchangeRateRepository) -> Self {
+        Self {
             conf: conf,
             repo: repo,
         }

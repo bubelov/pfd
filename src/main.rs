@@ -60,10 +60,13 @@ async fn cli(args: &[String]) {
                 exit(1);
             }
         }
-        _ => match args.get(0).unwrap().as_str() {
-            "db" => db::cli(&args[1..]).await,
+        _ => match args.first().unwrap().as_str() {
+            "db" => db::cli(&args[1..]).await.unwrap_or_else(|e| {
+                error!("{}", e.to_string());
+                exit(1);
+            }),
             _ => {
-                error!(?args, "Unknown action");
+                error!("Unknown action");
                 exit(1);
             }
         },

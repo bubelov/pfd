@@ -31,7 +31,7 @@ pub struct Migration {
 }
 
 impl Conf {
-    pub fn new() -> Result<Conf> {
+    pub fn new() -> Result<Self> {
         let db_url = env::var("DATA_DIR").with_context(|| "DATA_DIR isn't set")?;
         let db_url = Path::new(&db_url).join("pfd.db");
 

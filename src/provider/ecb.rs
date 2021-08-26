@@ -16,8 +16,8 @@ pub struct EcbConf {
 }
 
 impl Ecb {
-    pub fn new(conf: EcbConf, repo: ExchangeRateRepository) -> Ecb {
-        Ecb {
+    pub fn new(conf: EcbConf, repo: ExchangeRateRepository) -> Self {
+        Self {
             conf: conf,
             repo: repo,
         }
