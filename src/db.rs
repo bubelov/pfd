@@ -8,8 +8,8 @@ use futures::future::join_all;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
-use std::{fs::remove_file, path::Path, process::exit};
-use tracing::{error, info, warn};
+use std::{fs::remove_file, path::Path};
+use tracing::{info, warn};
 
 #[derive(Debug)]
 pub enum DbVersion {
@@ -21,32 +21,14 @@ pub async fn cli(args: &[String]) -> Result<()> {
     let first_arg = args.first().ok_or(Error::msg("No args provided"))?;
 
     match first_arg.as_str() {
-        "drop" => drop().context("Unable to drop database")?,
-        "migrate" => {
-            let version = match args.get(1) {
-                Some(version) => DbVersion::Specific(version.parse::<i16>().unwrap()),
-                None => DbVersion::Latest,
-            };
-            let pool = pool().unwrap();
-            migrate(&mut pool.get().unwrap(), version).unwrap_or_else(|e| {
-                error!(%e, "Migration failed");
-                exit(1);
-            });
-        }
-        "sync" => sync(&args[1..]).await.unwrap_or_else(|e| {
-            error!(%e, "Sync failed");
-            exit(1);
-        }),
-        _ => {
-            error!(?args, "Unknown argument");
-            exit(1);
-        }
-    };
-
-    Ok(())
+        "drop" => cli_drop().context("Unable to drop database"),
+        "migrate" => cli_migrate(args.get(1)),
+        "sync" => cli_sync(&args[1..]).await,
+        _ => Err(Error::msg("Unknown argument")),
+    }
 }
 
-fn drop() -> Result<()> {
+fn cli_drop() -> Result<()> {
     let db_url: String = Conf::new()?.db_url;
     let db_url: &Path = Path::new(&db_url);
     warn!(?db_url, "Dropping database");
@@ -61,11 +43,20 @@ fn drop() -> Result<()> {
     Ok(())
 }
 
+fn cli_migrate(ver: Option<&String>) -> Result<()> {
+    let ver = match ver {
+        Some(ver) => DbVersion::Specific(ver.parse().context("Can't parse database version")?),
+        None => DbVersion::Latest,
+    };
+    let pool = pool().unwrap();
+    migrate(&mut pool.get().unwrap(), ver)
+}
+
 pub fn migrate_to_latest(conn: &mut Connection) -> Result<()> {
     migrate(conn, DbVersion::Latest)
 }
 
-pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
+fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     let current_version = schema_version(conn)?;
     info!(?current_version, ?target_version, "Migrating db schema");
 
@@ -121,7 +112,7 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     Ok(())
 }
 
-async fn sync(args: &[String]) -> Result<()> {
+async fn cli_sync(args: &[String]) -> Result<()> {
     let conf = Conf::new()?;
     let pool = pool()?;
 
@@ -136,19 +127,17 @@ async fn sync(args: &[String]) -> Result<()> {
                 result?;
             }
         }
-        1 => {
-            if args.get(0).unwrap_or(&"".to_string()) == "now" {
+        1 => match args.first().unwrap().as_str() {
+            "now" => {
                 let results = join_all(vec![ecb.sync(), iex.sync()]).await;
 
                 for result in results {
                     result?;
                 }
-            } else {
-                error!(?args, "Invalid arguments");
-                exit(1);
             }
-        }
-        _ => error!(?args, "Invalid arguments"),
+            _ => return Err(Error::msg("Unknown arguments")),
+        },
+        _ => return Err(Error::msg("Unknown arguments")),
     }
 
     Ok(())
