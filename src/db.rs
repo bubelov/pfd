@@ -8,7 +8,7 @@ use futures::future::join_all;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
-use std::{fs::remove_file, process::exit};
+use std::{fs::remove_file, path::Path, process::exit};
 use tracing::{error, info, warn};
 
 #[derive(Debug)]
@@ -47,10 +47,17 @@ pub async fn cli(args: &[String]) -> Result<()> {
 }
 
 fn drop() -> Result<()> {
-    let db_url = Conf::new()?.db_url;
+    let db_url: String = Conf::new()?.db_url;
+    let db_url: &Path = Path::new(&db_url);
     warn!(?db_url, "Dropping database");
-    remove_file(db_url)?;
-    warn!("Database has been dropped");
+
+    if !db_url.exists() {
+        warn!("Database doesn't exist");
+    } else {
+        remove_file(db_url)?;
+        warn!("Database has been dropped");
+    }
+
     Ok(())
 }
 
@@ -79,7 +86,7 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
     if current_version == target_version {
         info!("Schema is up to date");
     } else if current_version < target_version {
-        info!("Schema is outdated, updating...");
+        warn!("Schema is outdated, updating...");
         let migrations: Vec<Migration> = migrations
             .iter()
             .filter(|it| it.version > current_version)
@@ -87,12 +94,12 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
             .collect();
         warn!(count = migrations.len(), "Found pending migrations");
         for migr in migrations {
-            info!(%migr.version, sql = &migr.up.trim(), "Updating schema");
+            warn!(%migr.version, sql = &migr.up.trim(), "Updating schema");
             conn.execute_batch(&migr.up)?;
             conn.execute_batch(&format!("PRAGMA user_version={}", migr.version))?;
         }
     } else {
-        info!("Downgrading the schema...");
+        warn!("Downgrading the schema...");
         let migrations: Vec<Migration> = migrations
             .iter()
             .filter(|it| it.version > target_version)
@@ -100,7 +107,7 @@ pub fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
             .collect();
         warn!(count = migrations.len(), "Found pending migrations");
         for migr in migrations.iter().rev() {
-            info!(
+            warn!(
                 from = migr.version,
                 to = migr.version - 1,
                 sql = &migr.down.trim(),
