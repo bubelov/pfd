@@ -48,8 +48,8 @@ fn cli_migrate(ver: Option<&String>) -> Result<()> {
         Some(ver) => DbVersion::Specific(ver.parse().context("Can't parse database version")?),
         None => DbVersion::Latest,
     };
-    let pool = pool().unwrap();
-    migrate(&mut pool.get().unwrap(), ver)
+    let mut conn = new_connection()?;
+    migrate(&mut conn, ver)
 }
 
 pub fn migrate_to_latest(conn: &mut Connection) -> Result<()> {
@@ -114,7 +114,7 @@ fn migrate(conn: &mut Connection, target_version: DbVersion) -> Result<()> {
 
 async fn cli_sync(args: &[String]) -> Result<()> {
     let conf = Conf::new()?;
-    let pool = pool()?;
+    let pool = new_pool()?;
 
     let ecb = Ecb::new(conf.providers.ecb, ExchangeRateRepository::new(&pool));
     let iex = Iex::new(conf.providers.iex, ExchangeRateRepository::new(&pool));
@@ -143,7 +143,12 @@ async fn cli_sync(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn pool() -> Result<Pool<SqliteConnectionManager>> {
+fn new_connection() -> Result<Connection> {
+    let db_url = Conf::new()?.db_url;
+    Ok(Connection::open(db_url)?)
+}
+
+fn new_pool() -> Result<Pool<SqliteConnectionManager>> {
     let db_url = Conf::new()?.db_url;
     let manager = SqliteConnectionManager::file(db_url);
     Ok(Pool::new(manager)?)
