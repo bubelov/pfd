@@ -1,5 +1,5 @@
 use crate::provider::{EcbConf, IexConf};
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use figment::{
     providers::{Format, Toml},
     Figment,
@@ -50,8 +50,15 @@ impl Conf {
             Err(_) => conf,
         };
 
-        Ok(conf
+        let conf: Self = conf
             .extract()
-            .with_context(|| "Failed to deserialize config")?)
+            .with_context(|| "Failed to deserialize config")?;
+
+        ensure!(
+            !conf.providers.iex.crypto || conf.providers.iex.token.len() > 0,
+            "IEX provider is enabled but token isn't set"
+        );
+
+        Ok(conf)
     }
 }

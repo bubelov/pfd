@@ -121,18 +121,14 @@ async fn cli_sync(args: &[String]) -> Result<()> {
 
     match args.len() {
         0 => {
-            let results = join_all(vec![ecb.schedule(), iex.schedule()]).await;
-
-            for result in results {
-                result?;
+            for res in join_all(vec![ecb.sync(), iex.sync()]).await {
+                res?;
             }
         }
         1 => match args.first().unwrap().as_str() {
-            "now" => {
-                let results = join_all(vec![ecb.sync(), iex.sync()]).await;
-
-                for result in results {
-                    result?;
+            "schedule" => {
+                for res in join_all(vec![ecb.schedule(), iex.schedule()]).await {
+                    res?;
                 }
             }
             _ => return Err(Error::msg("Unknown arguments")),
